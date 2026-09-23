@@ -1,17 +1,14 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { KINDS, store } from './store.js';
-import { shareGlyph } from './share.js';
 
-export function Reels({ glyphs, profile, notify }) {
+export function Reels({ glyphs, profile, onShare, onRefresh }) {
   const [likes, setLikes] = useState({});
 
   useEffect(() => {
-    (async () => {
-      const l = {};
-      for (const g of glyphs) l[g.id] = g.likes || 0;
-      setLikes(l);
-    })();
+    const l = {};
+    for (const g of glyphs) l[g.id] = g.likes || 0;
+    setLikes(l);
   }, [glyphs]);
 
   if (glyphs.length === 0) {
@@ -22,11 +19,13 @@ export function Reels({ glyphs, profile, notify }) {
     );
   }
 
+  const wallGlyphs = glyphs.filter((g) => g.wall);
+
   return h('div', { class: 'reels' },
     glyphs.map((g) =>
       h('section', { class: `reel k-${g.kind}`, key: g.id },
         h('div', { class: 'reel-orb' }),
-        h('div', { class: 'reel-glyph glow kface' }, g.symbol),
+        h('div', { class: 'reel-glyph glow' }, g.symbol),
         h('div', { class: 'reel-meta glass' },
           h('div', null,
             h('span', { class: 'who' }, profile.glyphName),
@@ -35,20 +34,25 @@ export function Reels({ glyphs, profile, notify }) {
           )
         ),
         h('div', { class: 'rail' },
-          h('div', { class: 'rail-top' },
-            h('button', {
-              class: 'act',
-              onClick: async () => {
-                await store.like(g.id);
-                setLikes({ ...likes, [g.id]: (likes[g.id] || 0) + 1 });
-              }
-            },
-              h('span', null, '♥'),
-              h('small', null, likes[g.id] || 0)
-            ),
-            h('button', { class: 'act', onClick: () => shareGlyph(g, notify) }, h('span', null, '⤴')),
+          h('button', {
+            class: 'act',
+            onClick: async () => {
+              await store.like(g.id);
+              setLikes({ ...likes, [g.id]: (likes[g.id] || 0) + 1 });
+            }
+          },
+            h('span', null, '♥'),
+            h('small', null, likes[g.id] || 0)
           ),
-          h('small', { class: 'kindlabel' }, KINDS.find((k) => k.kind === g.kind).name)
+          h('button', { class: 'act', onClick: () => onShare(g) }, h('span', null, '⤴')),
+          h('button', {
+            class: 'act',
+            title: 'Delete',
+            onClick: async () => { await store.deleteGlyph(g.id); if (onRefresh) onRefresh(); }
+          }, h('span', null, '🗑')),
+          h('small', { class: 'kindlabel' },
+            (KINDS.find((k) => k.kind === g.kind) || {}).name || 'Glyph'
+          )
         )
       )
     )

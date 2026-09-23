@@ -1,25 +1,8 @@
 export function glyphCard(g) {
   const lines = [`${g.symbol}  ${g.label}`];
   if (g.note) lines.push(g.note);
-  lines.push('— shared from Glifon ◆');
+  lines.push('— shared from Gliffon ◆');
   return lines.join('\n');
-}
-
-export async function shareGlyph(g, notify) {
-  const data = { title: 'Glifon glyph', text: glyphCard(g) };
-  try {
-    if (navigator.share) {
-      await navigator.share(data);
-      return true;
-    }
-    await navigator.clipboard.writeText(data.text);
-    notify('Copied to clipboard');
-    return true;
-  } catch (e) {
-    if (e && e.name === 'AbortError') return false;
-    notify('Sharing unavailable');
-    return false;
-  }
 }
 
 export const remind = {

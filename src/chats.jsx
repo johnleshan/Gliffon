@@ -10,7 +10,7 @@ const REPLIES = [
   'bookmarking the feeling'
 ];
 
-export function Chats({ openContactId, setOpenContactId, onCount }) {
+export function Chats({ openContactId, setOpenContactId, refreshContacts }) {
   const [contacts, setContacts] = useState([]);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
@@ -24,7 +24,6 @@ export function Chats({ openContactId, setOpenContactId, onCount }) {
     (async () => {
       await loadContacts();
       if (openContactId) setMessages(await store.listMessages(openContactId));
-      onCount(0);
     })();
   }, [openContactId]);
 
@@ -66,6 +65,7 @@ export function Chats({ openContactId, setOpenContactId, onCount }) {
               await store.addContact({ id: uid(), name: newName.trim(), symbol: newSym, added: Date.now() });
               setNewName(''); setAdding(false);
               await loadContacts();
+              if (refreshContacts) refreshContacts();
             }
           }, 'Add')
         )
