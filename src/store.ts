@@ -26,6 +26,7 @@ interface DBSchema {
 interface Store {
   getProfile(): Promise<Profile | undefined>;
   saveProfile(p: Profile): Promise<void>;
+  clearProfile(): Promise<void>;
   addGlyph(g: Glyph): Promise<void>;
   listGlyphs(): Promise<Glyph[]>;
   deleteGlyph(id: string): Promise<void>;
@@ -61,6 +62,10 @@ export const store: Store = {
   },
   async saveProfile(p) {
     await (await db()).put('profile', p, 'me');
+  },
+  async clearProfile() {
+    await (await db()).delete('profile', 'me');
+    localStorage.removeItem('gliffon.me');
   },
   async addGlyph(g) {
     await (await db()).add('glyphs', g);

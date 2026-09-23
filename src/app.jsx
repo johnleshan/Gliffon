@@ -278,7 +278,18 @@ export function App() {
         }
       },
         remindState === 'on' ? 'Reminders: on' : 'Reminders: off'
-      )
+      ),
+      h('button', {
+        class: 'btn ghost',
+        onClick: async () => {
+          await store.clearProfile();
+          setProfile(undefined);
+          setTab('reels');
+          setUnread(0);
+          setOpenChat(null);
+          notify('Signed out');
+        }
+      }, 'Log out')
     ),
     h('nav', null,
       [
