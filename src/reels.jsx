@@ -2,13 +2,9 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { KINDS, store } from './store.js';
 
-export function Reels({ glyphs, profile, onShare, onRefresh }) {
-  const [likes, setLikes] = useState({});
-
+export function Reels({ glyphs, profile, onShare, onRefresh, onLike, onRemove }) {
   useEffect(() => {
-    const l = {};
-    for (const g of glyphs) l[g.id] = g.likes || 0;
-    setLikes(l);
+    setLikes(Object.fromEntries(glyphs.map((g) => [g.id, g.likes || 0])));
   }, [glyphs]);
 
   if (glyphs.length === 0) {
@@ -19,8 +15,6 @@ export function Reels({ glyphs, profile, onShare, onRefresh }) {
     );
   }
 
-  const wallGlyphs = glyphs.filter((g) => g.wall);
-
   return h('div', { class: 'reels' },
     glyphs.map((g) =>
       h('section', { class: `reel k-${g.kind}`, key: g.id },
@@ -28,7 +22,7 @@ export function Reels({ glyphs, profile, onShare, onRefresh }) {
         h('div', { class: 'reel-glyph glow' }, g.symbol),
         h('div', { class: 'reel-meta glass' },
           h('div', null,
-            h('span', { class: 'who' }, profile.glyphName),
+            h('span', { class: 'who' }, (g.who && g.who.name) || profile.glyphName),
             h('b', null, ` ${g.label}`),
             g.note ? h('p', { class: 'note' }, g.note) : null
           )
@@ -36,20 +30,12 @@ export function Reels({ glyphs, profile, onShare, onRefresh }) {
         h('div', { class: 'rail' },
           h('button', {
             class: 'act',
-            onClick: async () => {
-              await store.like(g.id);
-              setLikes({ ...likes, [g.id]: (likes[g.id] || 0) + 1 });
-            }
+            onClick: () => onLike(g)
           },
             h('span', null, '♥'),
             h('small', null, likes[g.id] || 0)
           ),
           h('button', { class: 'act', onClick: () => onShare(g) }, h('span', null, '⤴')),
-          h('button', {
-            class: 'act',
-            title: 'Delete',
-            onClick: async () => { await store.deleteGlyph(g.id); if (onRefresh) onRefresh(); }
-          }, h('span', null, '🗑')),
           h('small', { class: 'kindlabel' },
             (KINDS.find((k) => k.kind === g.kind) || {}).name || 'Glyph'
           )

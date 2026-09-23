@@ -1,7 +1,7 @@
 {
   "name": "glifon",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.1",
     "idb": "^8.0.3",
     "preact": "^10.27.2"
   },

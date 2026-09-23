@@ -1,6 +1,5 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
-import { store, uid } from './store.js';
+import { useState } from 'preact/hooks';
 import { glyphCard } from './share.js';
 
 // In-app share sheet: send to a contact, cast to the wall, or native share fallback.

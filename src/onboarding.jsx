@@ -31,6 +31,7 @@ export function Onboarding({ onDone }) {
       onClick: () => onDone({
         name: name.trim(),
         glyphName: glyphName.trim(),
+        symbol,
         joined: Date.now()
       })
     }, 'Enter Gliffon ✦')
