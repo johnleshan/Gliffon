@@ -4,6 +4,7 @@ import { store, KINDS, uid } from './store.js';
 import { Composer } from './composer.jsx';
 import { Onboarding } from './onboarding.jsx';
 import { shareGlyph, remind } from './share.js';
+import { Pulse } from './pulse.jsx';
 
 export function App() {
   const [profile, setProfile] = useState(undefined);
@@ -82,7 +83,9 @@ export function App() {
                     )
                   )
                 ))
-        : h('main', null, h('div', { class: 'profile card' },
+        : tab === 'pulse'
+          ? h('main', null, h(Pulse, { glyphs }))
+          : h('main', null, h('div', { class: 'profile card' },
             h('span', { class: 'avatar' }, profile.glyphName.slice(0, 1).toUpperCase()),
             h('h2', null, profile.name),
             h('p', { class: 'sub' }, `Glyph ${profile.glyphName}`),
@@ -111,12 +114,12 @@ export function App() {
           )),
     h('div', { class: 'toast', role: 'status' }, toast),
     h('nav', null,
-      ['glyphs', 'timeline', 'profile'].map((t) =>
+      ['glyphs', 'timeline', 'pulse', 'profile'].map((t) =>
         h('button', {
           key: t,
           class: tab === t ? 'active' : '',
           onClick: () => setTab(t)
-        }, t === 'glyphs' ? '✦ Create' : t === 'timeline' ? '☰ Timeline' : '☺ Profile')
+        }, t === 'glyphs' ? '✦ Create' : t === 'timeline' ? '☰ Timeline' : t === 'pulse' ? '📈 Pulse' : '☺ Profile')
       )
     )
   );

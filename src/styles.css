@@ -110,6 +110,28 @@ input:focus, textarea:focus { outline: 2px solid var(--accent2); border-color: t
 
 .empty { color: var(--muted); text-align: center; margin-top: 48px; }
 
+.statrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat { text-align: center; padding: 16px 8px; }
+.stat b { font-size: 20px; display: block; }
+
+.pulse h3 { margin: 0 0 12px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.chart { display: flex; align-items: flex-end; gap: 10px; height: 110px; }
+.barwrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; }
+.barwrap .bar {
+  width: 100%; min-height: 4px; border-radius: 8px 8px 0 0; margin-top: auto;
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+}
+.barwrap span { font-size: 11px; color: var(--muted); }
+.krow { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.kname { width: 84px; font-size: 13px; }
+.ktrack { flex: 1; height: 10px; border-radius: 6px; background: rgba(255,255,255,0.07); overflow: hidden; }
+.kfill { height: 100%; border-radius: 6px; }
+.kfill.k-love { background: var(--accent); }
+.kfill.k-mood { background: #ffd166; }
+.kfill.k-memory { background: var(--accent2); }
+.kfill.k-creativity { background: #4dd9a8; }
+.kcount { width: 24px; text-align: right; font-size: 13px; }
+
 .avatar {
   width: 64px; height: 64px; display: grid; place-items: center;
   font-size: 26px; font-weight: 800; color: white;
