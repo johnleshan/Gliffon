@@ -1,12 +1,7 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
-import { KINDS, store } from './store.js';
+import { KINDS } from './store.js';
 
-export function Reels({ glyphs, profile, onShare, onRefresh, onLike, onRemove }) {
-  useEffect(() => {
-    setLikes(Object.fromEntries(glyphs.map((g) => [g.id, g.likes || 0])));
-  }, [glyphs]);
-
+export function Reels({ glyphs, profile, onShare, onLike }) {
   if (glyphs.length === 0) {
     return h('div', { class: 'reels-empty' },
       h('div', { class: 'preview-glyph glow' }, '✦'),
@@ -22,7 +17,7 @@ export function Reels({ glyphs, profile, onShare, onRefresh, onLike, onRemove })
         h('div', { class: 'reel-glyph glow' }, g.symbol),
         h('div', { class: 'reel-meta glass' },
           h('div', null,
-            h('span', { class: 'who' }, (g.who && g.who.name) || profile.glyphName),
+            h('span', { class: 'who' }, (g.who && g.who.glyphname) || (g.who && g.who.name) || profile.glyphName),
             h('b', null, ` ${g.label}`),
             g.note ? h('p', { class: 'note' }, g.note) : null
           )
@@ -33,7 +28,7 @@ export function Reels({ glyphs, profile, onShare, onRefresh, onLike, onRemove })
             onClick: () => onLike(g)
           },
             h('span', null, '♥'),
-            h('small', null, likes[g.id] || 0)
+            h('small', null, g.likes || 0)
           ),
           h('button', { class: 'act', onClick: () => onShare(g) }, h('span', null, '⤴')),
           h('small', { class: 'kindlabel' },
