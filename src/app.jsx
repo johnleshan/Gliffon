@@ -2,7 +2,7 @@ import { h, Fragment } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { store, KINDS, uid } from './store.js';
 import { Composer } from './composer.jsx';
-import { Onboarding } from './onboarding.jsx';
+import { Auth } from './auth.jsx';
 import { remind, glyphCard } from './share.js';
 import { Pulse } from './pulse.jsx';
 import { Reels } from './reels.jsx';
@@ -73,7 +73,6 @@ export function App() {
     let alive = true;
     (async () => {
       try {
-        await backend.ensureUser(profile);
         await refresh();
       } catch (e) {
         notify('Backend: ' + e.message);
@@ -140,10 +139,36 @@ export function App() {
   }
 
   if (!profile) {
-    return h(Onboarding, {
-      onDone: async (p) => {
+    return h(Auth, {
+      connected: backendOK,
+      onSignUp: async (p) => {
+        if (backendOK && backend) await backend.signup(p);
         await store.saveProfile(p);
         setProfile(p);
+        notify('Welcome to Gliffon ✦');
+        refresh();
+      },
+      onSignIn: async (handle) => {
+        if (backendOK && backend) {
+          const u = await backend.signIn(handle);
+          if (!u) throw new Error('no account with that glyph name — create one');
+          await store.saveProfile({
+            name: u.name,
+            glyphName: u.glyphname,
+            symbol: u.symbol,
+            joined: new Date(u.created || Date.now()).getTime()
+          });
+          setProfile({
+            name: u.name,
+            glyphName: u.glyphname,
+            symbol: u.symbol,
+            joined: new Date(u.created || Date.now()).getTime()
+          });
+          notify(`Signed in as ${u.glyphname} ✦`);
+          refresh();
+        } else {
+          throw new Error('sign-in works online — localhost runs offline-only');
+        }
       }
     });
   }
@@ -253,14 +278,7 @@ export function App() {
         }
       },
         remindState === 'on' ? 'Reminders: on' : 'Reminders: off'
-      ),
-      h('button', {
-        class: 'btn ghost',
-        onClick: async () => {
-          await store.saveProfile({ ...profile, symbol: profile.symbol || '✦' });
-          notify('Profile saved');
-        }
-      }, 'Save profile')
+      )
     ),
     h('nav', null,
       [

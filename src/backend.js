@@ -43,28 +43,36 @@ try { me.id = JSON.parse(localStorage.getItem('gliffon.me')); } catch { me.id = 
 export const backend = cfg
   ? {
       online: true,
-      async ensureUser(profile) {
+      async signIn(glyphname) {
+        const rows = await j('/api/users');
+        const u = rows.find(
+          (r) => r.glyphname.toLowerCase() === glyphname.trim().toLowerCase()
+        );
+        if (!u) return null;
+        me.id = u.id;
+        localStorage.setItem('gliffon.me', JSON.stringify(u.id));
+        return u;
+      },
+      async signup(profile) {
+        const rows = await j('/api/users');
+        const taken = rows.find(
+          (r) => r.glyphname.toLowerCase() === profile.glyphName.trim().toLowerCase()
+        );
+        if (taken) throw new Error('that glyph name is taken');
         const user = {
-          id: me.id || (crypto.randomUUID ? crypto.randomUUID() : uid2()),
-          glyphname: profile.glyphName,
+          id: crypto.randomUUID ? crypto.randomUUID() : uid2(),
+          glyphname: profile.glyphName.trim(),
           name: profile.name,
           symbol: profile.symbol || '✦'
         };
-        try {
-          if (me.id) {
-            const known = await j('/api/users').then(
-              (u) => u.find((r) => r.id === me.id)
-            );
-            if (known) return known;
-          }
-          await j('/api/users', { method: 'POST', body: JSON.stringify(user) });
-        } catch {}
-        // if glyphname existed, fetch authoritative row
-        const rows = await j('/api/users');
-        const mine = rows.find((r) => r.glyphname === profile.glyphName) || user;
-        me.id = mine.id;
-        localStorage.setItem('gliffon.me', JSON.stringify(mine.id));
-        return mine;
+        await j('/api/users', { method: 'POST', body: JSON.stringify(user) });
+        me.id = user.id;
+        localStorage.setItem('gliffon.me', JSON.stringify(user.id));
+        return user;
+      },
+      sessionUser() {
+        if (!me.id) return null;
+        return j('/api/users').then((rows) => rows.find((r) => r.id === me.id) || null);
       },
       async listUsers() {
         const rows = await j('/api/users');

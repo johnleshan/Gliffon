@@ -9,8 +9,12 @@ export default bind(async (req, res) => {
   const afterMs = parseInt(url.searchParams.get('after') || '0', 10);
   const after = afterMs ? new Date(afterMs).toISOString() : null;
 
-  // wall delta: likes map + rows newer than after
-  const wall = await sql`select id, likes, created, kind, symbol, label, note, author, u.name as author_name, u.symbol as author_symbol, u.glyphname as author_handle from wall left join users u on u.id = wall.author order by wall.created desc limit 100`;
+  // wall+authors join (fully qualified so `id` is unambiguous)
+  const wall = await sql`
+    select wall.id, wall.likes, wall.created, wall.kind, wall.symbol, wall.label, wall.note, wall.author,
+           u.name as author_name, u.symbol as author_symbol, u.glyphname as author_handle
+    from wall left join users u on u.id = wall.author
+    order by wall.created desc limit 100`;
 
   // messages involving me created after transient cursor
   let msgs = [];

@@ -103,11 +103,27 @@ body {
 
 .onboard {
   min-height: 100dvh; display: flex; flex-direction: column;
-  align-items: center; padding-top: 14vh; text-align: center; padding-inline: 24px;
+  align-items: center; padding-top: 12vh; text-align: center; padding-inline: 24px;
 }
 .onboard h1 { margin: 14px 0 4px; font-size: 30px; letter-spacing: 0.5px; }
 .onboard .field { max-width: 320px; margin-bottom: 10px; }
+.onboard .btn { max-width: 320px; width: 100%; }
 .symrow { display: flex; gap: 8px; margin: 6px 0 18px; flex-wrap: wrap; justify-content: center; }
+
+.authtabs {
+  display: flex; gap: 6px; margin: 14px 0 18px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px;
+}
+.authtabs button {
+  border: none; background: none; color: var(--muted);
+  font: 600 13px system-ui; padding: 9px 18px; border-radius: 999px; cursor: pointer;
+}
+.authtabs button.on {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+}
+.beta { color: var(--accent); font-weight: 600; font-size: 13px; margin: 0 0 8px; }
 
 /* ---------- composer ---------- */
 
