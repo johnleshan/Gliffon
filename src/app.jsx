@@ -3,12 +3,20 @@ import { useEffect, useState } from 'preact/hooks';
 import { store, KINDS, uid } from './store.js';
 import { Composer } from './composer.jsx';
 import { Onboarding } from './onboarding.jsx';
+import { shareGlyph, remind } from './share.js';
 
 export function App() {
   const [profile, setProfile] = useState(undefined);
   const [glyphs, setGlyphs] = useState([]);
   const [tab, setTab] = useState('glyphs');
   const [ready, setReady] = useState(false);
+  const [toast, setToast] = useState('');
+  const [remindState, setRemindState] = useState(() => remind.status());
+
+  const notify = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2200);
+  };
 
   const refresh = async () => setGlyphs(await store.listGlyphs());
 
@@ -17,6 +25,7 @@ export function App() {
       setProfile(await store.getProfile());
       await refresh();
       setReady(true);
+      remind.schedule();
     })();
   }, []);
 
@@ -61,10 +70,16 @@ export function App() {
                       h('time', { datetime: new Date(g.created).toISOString() },
                         new Date(g.created).toLocaleString())
                     ),
-                    h('button', {
-                      class: 'del', 'aria-label': 'Delete',
-                      onClick: async () => { await store.deleteGlyph(g.id); await refresh(); }
-                    }, '×')
+                    h('div', { class: 'actions' },
+                      h('button', {
+                        class: 'share', 'aria-label': 'Share',
+                        onClick: () => shareGlyph(g, notify)
+                      }, '⤴'),
+                      h('button', {
+                        class: 'del', 'aria-label': 'Delete',
+                        onClick: async () => { await store.deleteGlyph(g.id); await refresh(); }
+                      }, '×')
+                    )
                   )
                 ))
         : h('main', null, h('div', { class: 'profile card' },
@@ -72,8 +87,29 @@ export function App() {
             h('h2', null, profile.name),
             h('p', { class: 'sub' }, `Glyph ${profile.glyphName}`),
             h('p', { class: 'sub' }, `Member since ${new Date(profile.joined).toLocaleDateString()}`),
-            h('p', { class: 'sub' }, `${glyphs.length} glyphs created`)
+            h('p', { class: 'sub' }, `${glyphs.length} glyphs created`),
+            h('button', {
+              class: 'primary',
+              onClick: async () => {
+                if (remindState === 'on') {
+                  remind.disable();
+                  setRemindState('off');
+                  notify('Reminders off');
+                } else {
+                  const r = await remind.enable();
+                  setRemindState(r);
+                  if (r === 'on') remind.schedule();
+                  else if (r === 'denied') notify('Permission denied');
+                  else notify('Notifications unsupported');
+                }
+              }
+            },
+              remindState === 'on'
+                ? 'Turn off daily glyph reminder'
+                : 'Turn on daily glyph reminder'
+            )
           )),
+    h('div', { class: 'toast', role: 'status' }, toast),
     h('nav', null,
       ['glyphs', 'timeline', 'profile'].map((t) =>
         h('button', {
