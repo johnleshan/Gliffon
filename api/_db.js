@@ -1,27 +1,35 @@
 import { neon } from '@neondatabase/serverless';
 
+let sqlCache;
 export function conn() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL not configured');
-  return neon(url);
+  if (!sqlCache) sqlCache = neon(url);
+  return sqlCache;
 }
 
-const CORS = (req) => ({
-  'content-type': 'application/json',
-  'access-control-allow-origin': req.headers.get('origin') || '*',
-  'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
-  'access-control-allow-headers': 'content-type'
-});
-
-export function json(req, data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: CORS(req) });
+function cors(res) {
+  res.setHeader('content-type', 'application/json');
+  res.setHeader('access-control-allow-origin', '*');
+  res.setHeader('access-control-allow-methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+  res.setHeader('access-control-allow-headers', 'content-type');
 }
 
-export const bind = (fn) => async (req) => {
-  if (req.method === 'OPTIONS') return json(req, {});
+export function json(res, data, status = 200) {
+  res.statusCode = status;
+  res.end(JSON.stringify(data));
+}
+
+export const bind = (fn) => async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    cors(res);
+    return res.end();
+  }
+  cors(res);
   try {
-    return json(req, await fn(req));
+    await fn(req, res);
   } catch (e) {
-    return json(req, { error: e.message }, 500);
+    res.statusCode = 500;
+    res.end(JSON.stringify({ error: e.message }));
   }
 };
