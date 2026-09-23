@@ -19,6 +19,9 @@ export const saveBackendConfig = (base) => {
 export const clearBackendConfig = () => localStorage.removeItem(CONFIG_KEY);
 
 let cfg = getBackendConfig();
+// Online social app: on any real deployment, go live by default (same-origin API).
+const isLocal = /(localhost|127\.0\.0\.1)/.test(location.hostname);
+if (!cfg && !isLocal) cfg = { url: '' };
 
 function api(path) {
   return cfg.url.startsWith('http') ? cfg.url + path : location.origin + path;

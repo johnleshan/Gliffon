@@ -21,7 +21,9 @@ export function App() {
   const [openChat, setOpenChat] = useState(null);
   const [shareTarget, setShareTarget] = useState(null);
   const [contacts, setContacts] = useState([]);
-  const [backendOK, setBackendOK] = useState(() => !!getBackendConfig());
+  const [backendOK, setBackendOK] = useState(
+    () => !!getBackendConfig() || !/(localhost|127\.0\.0\.1)/.test(location.hostname)
+  );
   const [liveMsg, setLiveMsg] = useState(null);
   const [connect, setConnect] = useState(false);
   const openRef = useRef(null);
@@ -157,14 +159,7 @@ export function App() {
   };
 
   return h('div', { class: 'shell' },
-        tab === 'glyphs' && h(Composer, { onGlyph: cast }),
-    !backendOK
-      ? h('button', {
-          class: 'offlinebar tappable',
-          onClick: () => setConnect(true)
-        }, '📴 Running offline on this device — tap here to go live and meet people ✦')
-      : null,
-    tab === 'reels' && h(Reels, {
+        tab === 'glyphs' && h(Composer, { onGlyph: cast }),    tab === 'reels' && h(Reels, {
       glyphs, profile,
       onShare: setShareTarget,
       onRefresh: refresh,
