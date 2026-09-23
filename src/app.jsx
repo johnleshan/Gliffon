@@ -58,26 +58,26 @@ export function App() {
     })();
   }, []);
 
-  // when profile exists + backend configured: register me, load data, live subscribe
+  // when profile exists + backend configured: register me, load data, poll for live updates
   useEffect(() => {
     if (!profile || !backendOK || !backend) return;
+    let alive = true;
     (async () => {
       try {
         await backend.ensureUser(profile);
         await refresh();
-        backend.subscribe(
-          () => refresh(),
-          (p) => {
-            setLiveMsg({ ...p, _t: Date.now() });
-            if (!p.conv || p.conv.split('|').includes(myId())) return;
-            if (openRef.current) return;
-            setTab('chats');
-          }
-        );
       } catch (e) {
-        notify('Backend error: ' + e.message);
+        notify('Backend: ' + e.message);
       }
     })();
+    const tick = setInterval(async () => {
+      if (document.visibilityState === 'hidden' || !alive) return;
+      try {
+        await refresh();
+        setLiveMsg({ _t: Date.now() });
+      } catch {}
+    }, 4000);
+    return () => { alive = false; clearInterval(tick); };
   }, [profile, backendOK]);
 
   if (!ready) {
