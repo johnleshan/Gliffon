@@ -157,10 +157,14 @@ export function App() {
   };
 
   return h('div', { class: 'shell' },
-    tab === 'glyphs' && h(Composer, { onGlyph: cast }),
-    !backendOK && tab === 'reels'
-      ? h('div', { class: 'offlinebar' }, 'Offline mode — casting stays on this device. Connect on the You tab to go live.')
-      : null,    tab === 'reels' && h(Reels, {
+        tab === 'glyphs' && h(Composer, { onGlyph: cast }),
+    !backendOK
+      ? h('button', {
+          class: 'offlinebar tappable',
+          onClick: () => setConnect(true)
+        }, '📴 Running offline on this device — tap here to go live and meet people ✦')
+      : null,
+    tab === 'reels' && h(Reels, {
       glyphs, profile,
       onShare: setShareTarget,
       onRefresh: refresh,
@@ -185,7 +189,7 @@ export function App() {
       ),
       !backendOK
         ? h('button', { class: 'btn primary', onClick: () => setConnect(true) }, '🌐 Connect people (free)')
-        : h('button', { class: 'btn primary', onClick: () => setConnect(true) }, '🌐 Supabase: connected ✓'),
+        : h('button', { class: 'btn primary', onClick: () => setConnect(true) }, '🌐 Neon: connected ✓'),
       h('button', {
         class: 'btn primary',
         onClick: async () => {
