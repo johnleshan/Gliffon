@@ -5,14 +5,19 @@ import { Composer } from './composer.jsx';
 import { Onboarding } from './onboarding.jsx';
 import { shareGlyph, remind } from './share.js';
 import { Pulse } from './pulse.jsx';
+import { Reels } from './reels.jsx';
+import { Chats } from './chats.jsx';
 
 export function App() {
   const [profile, setProfile] = useState(undefined);
+
   const [glyphs, setGlyphs] = useState([]);
-  const [tab, setTab] = useState('glyphs');
+  const [tab, setTab] = useState('reels');
   const [ready, setReady] = useState(false);
   const [toast, setToast] = useState('');
   const [remindState, setRemindState] = useState(() => remind.status());
+  const [openChat, setOpenChat] = useState(null);
+  const [chatCount, setChatCount] = useState(0);
 
   const notify = (msg) => {
     setToast(msg);
@@ -30,7 +35,9 @@ export function App() {
     })();
   }, []);
 
-  if (!ready) return null;
+  if (!ready) {
+    return h('div', { class: 'boot' }, h('span', { class: 'preview-glyph glow' }, '◆'));
+  }
 
   if (!profile) {
     return h(Onboarding, {
@@ -42,85 +49,58 @@ export function App() {
   }
 
   const save = async (draft) => {
-    await store.addGlyph({ id: uid(), created: Date.now(), ...draft });
+    await store.addGlyph({ id: uid(), created: Date.now(), likes: 0, ...draft });
     await refresh();
-    setTab('timeline');
+    setTab('reels');
   };
 
   return h('div', { class: 'shell' },
-    h('header', null,
-      h('span', { class: 'logo' }, '◆'),
-      h('div', null,
-        h('h1', null, 'Glifon'),
-        h('p', { class: 'sub' }, `Signed in as ${profile.name}`)
-      )
+    tab === 'glyphs' && h(Composer, { onGlyph: save }),
+    tab === 'reels' && h(Reels, { glyphs, profile, notify }),
+    tab === 'chats' && h(Chats, { openContactId: openChat, setOpenContactId: setOpenChat, onCount: setChatCount }),
+    tab === 'pulse' && h(Pulse, { glyphs }),
+    tab === 'profile' && h('section', { class: 'profile' },
+      h('div', { class: 'card profilecard' },
+        h('span', { class: 'avatar glow' }, profile.glyphName.slice(0, 1).toUpperCase()),
+        h('h2', null, profile.name),
+        h('p', { class: 'sub' }, `glyph name: ${profile.glyphName}`),
+        h('p', { class: 'sub' }, `since ${new Date(profile.joined).toLocaleDateString()} · ${glyphs.length} glyphs`)
+      ),
+      h('button', {
+        class: 'btn primary',
+        onClick: async () => {
+          if (remindState === 'on') {
+            remind.disable(); setRemindState('off'); notify('Reminders off');
+          } else {
+            const r = await remind.enable();
+            setRemindState(r);
+            if (r === 'on') remind.schedule();
+            else notify(r === 'denied' ? 'Permission denied' : 'Notifications unsupported');
+          }
+        }
+      }, remindState === 'on' ? 'Reminders: on' : 'Reminders: off')
     ),
-    tab === 'glyphs'
-      ? h('main', null, h(Composer, { onGlyph: save }))
-      : tab === 'timeline'
-        ? h('main', null,
-            glyphs.length === 0
-              ? h('p', { class: 'empty' }, 'No glyphs yet. Create your first one.')
-              : glyphs.map((g) =>
-                  h('div', { class: `glyph card k-${g.kind}`, key: g.id },
-                    h('span', { class: 'sym' }, g.symbol),
-                    h('div', null,
-                      h('b', null, g.label),
-                      g.moodTag ? h('span', { class: 'tag' }, ` ${g.moodTag}`) : null,
-                      g.note ? h('p', { class: 'note' }, g.note) : null,
-                      h('time', { datetime: new Date(g.created).toISOString() },
-                        new Date(g.created).toLocaleString())
-                    ),
-                    h('div', { class: 'actions' },
-                      h('button', {
-                        class: 'share', 'aria-label': 'Share',
-                        onClick: () => shareGlyph(g, notify)
-                      }, '⤴'),
-                      h('button', {
-                        class: 'del', 'aria-label': 'Delete',
-                        onClick: async () => { await store.deleteGlyph(g.id); await refresh(); }
-                      }, '×')
-                    )
-                  )
-                ))
-        : tab === 'pulse'
-          ? h('main', null, h(Pulse, { glyphs }))
-          : h('main', null, h('div', { class: 'profile card' },
-            h('span', { class: 'avatar' }, profile.glyphName.slice(0, 1).toUpperCase()),
-            h('h2', null, profile.name),
-            h('p', { class: 'sub' }, `Glyph ${profile.glyphName}`),
-            h('p', { class: 'sub' }, `Member since ${new Date(profile.joined).toLocaleDateString()}`),
-            h('p', { class: 'sub' }, `${glyphs.length} glyphs created`),
-            h('button', {
-              class: 'primary',
-              onClick: async () => {
-                if (remindState === 'on') {
-                  remind.disable();
-                  setRemindState('off');
-                  notify('Reminders off');
-                } else {
-                  const r = await remind.enable();
-                  setRemindState(r);
-                  if (r === 'on') remind.schedule();
-                  else if (r === 'denied') notify('Permission denied');
-                  else notify('Notifications unsupported');
-                }
-              }
-            },
-              remindState === 'on'
-                ? 'Turn off daily glyph reminder'
-                : 'Turn on daily glyph reminder'
-            )
-          )),
-    h('div', { class: 'toast', role: 'status' }, toast),
     h('nav', null,
-      ['glyphs', 'timeline', 'pulse', 'profile'].map((t) =>
+      [
+        ['reels', '▶', 'Reels'],
+        ['glyphs', '✦', 'Cast'],
+        ['chats', '💬', 'Chats'],
+        ['pulse', '📈', 'Pulse'],
+        ['profile', '☺', 'You']
+      ].map(([t, icon, name]) =>
         h('button', {
           key: t,
           class: tab === t ? 'active' : '',
           onClick: () => setTab(t)
-        }, t === 'glyphs' ? '✦ Create' : t === 'timeline' ? '☰ Timeline' : t === 'pulse' ? '📈 Pulse' : '☺ Profile')
+        },
+          h('span', { class: 'navicon' }, icon),
+          name,
+          t === 'chats' && chatCount > 0
+            ? h('span', { class: 'badge' }, chatCount)
+            : null
+        )
       )
-    )
+    ),
+    h('div', { class: 'toast', role: 'status' }, toast)
   );
 }

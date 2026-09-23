@@ -1,6 +1,5 @@
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
-import { KINDS } from './store.js';
 
 export function Onboarding({ onDone }) {
   const [name, setName] = useState('');
@@ -10,29 +9,30 @@ export function Onboarding({ onDone }) {
   const symbols = ['✦', '❋', '◈', '☾', '✧', '⟡'];
 
   return h('main', { class: 'onboard' },
-    h('span', { class: 'logo big' }, '◆'),
-    h('h1', null, 'Welcome to Glifon'),
-    h('p', { class: 'sub' }, 'Express what you feel through glyphs.'),
+    h('span', { class: 'avatar glow', style: 'width:96px;height:96px;font-size:38px' }, '◆'),
+    h('h1', null, 'Welcome to Gliffon'),
+    h('p', { class: 'sub' }, 'Express what you feel. Keep what you mean.'),
     h('input', {
-      placeholder: 'Your name', value: name,
+      class: 'field', placeholder: 'Your name', value: name, maxLength: 30,
       onInput: (e) => setName(e.currentTarget.value)
     }),
     h('input', {
-      placeholder: 'Name your personal glyph', value: glyphName,
+      class: 'field', placeholder: 'Name your personal glyph', value: glyphName, maxLength: 30,
       onInput: (e) => setGlyphName(e.currentTarget.value)
     }),
     h('div', { class: 'symrow' },
       symbols.map((s) =>
-        h('button', {
-          key: s, class: symbol === s ? 'symbtn picked' : 'symbtn',
-          onClick: () => setSymbol(s)
-        }, s)
+        h('button', { key: s, class: 'sym' + (symbol === s ? ' picked' : ''), onClick: () => setSymbol(s) }, s)
       )
     ),
     h('button', {
-      class: 'primary',
+      class: 'btn primary', style: 'max-width:320px',
       disabled: !name.trim() || !glyphName.trim(),
-      onClick: () => onDone({ name: name.trim(), glyphName: glyphName.trim(), joined: Date.now() })
-    }, 'Enter Glifon')
+      onClick: () => onDone({
+        name: name.trim(),
+        glyphName: glyphName.trim(),
+        joined: Date.now()
+      })
+    }, 'Enter Gliffon ✦')
   );
 }

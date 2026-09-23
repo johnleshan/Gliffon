@@ -8,38 +8,46 @@ export function Composer({ onGlyph }) {
   const [label, setLabel] = useState('');
   const [note, setNote] = useState('');
 
+  const current = KINDS.find((k) => k.kind === kind);
+
   const pickKind = (k) => {
     setKind(k.kind);
     setSymbol(k.symbols[0]);
   };
 
-  return h('section', null,
-    h('div', { class: 'kindrow' },
+  return h('section', { class: 'composer' },
+    h('div', { class: 'kinds' },
       KINDS.map((k) =>
         h('button', {
-          key: k.kind, class: k.kind === kind ? 'kindbtn active' : 'kindbtn',
+          key: k.kind,
+          class: `chip chip-${k.kind}` + (k.kind === kind ? ' on' : ''),
           onClick: () => pickKind(k)
         }, k.name)
       )
     ),
+    h('div', { class: 'preview' },
+      h('span', { class: 'preview-glyph glow kface' }, symbol)
+    ),
     h('div', { class: 'symgrid' },
-      (KINDS.find((k) => k.kind === kind)).symbols.map((s) =>
+      current.symbols.map((s) =>
         h('button', {
-          key: s, class: symbol === s ? 'symgridbtn picked' : 'symgridbtn',
+          key: s,
+          class: 'sym' + (symbol === s ? ' picked' : ''),
           onClick: () => setSymbol(s)
         }, s)
       )
     ),
     h('input', {
-      placeholder: 'What is it?', value: label,
+      class: 'field',
+      placeholder: 'Name that feeling…', value: label, maxLength: 40,
       onInput: (e) => setLabel(e.currentTarget.value)
     }),
     h('textarea', {
-      placeholder: 'Optional note…', value: note, rows: 3,
+      class: 'field', placeholder: 'Optional note…', value: note, rows: 3,
       onInput: (e) => setNote(e.currentTarget.value)
     }),
     h('button', {
-      class: 'primary',
+      class: 'btn primary',
       disabled: !label.trim(),
       onClick: () => {
         onGlyph({
@@ -49,6 +57,6 @@ export function Composer({ onGlyph }) {
         });
         setLabel(''); setNote('');
       }
-    }, 'Cast glyph')
+    }, 'Cast glyph ✦')
   );
 }
