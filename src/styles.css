@@ -1,0 +1,110 @@
+:root {
+  --bg: #0b0b14;
+  --card: #161624;
+  --text: #eaeaf2;
+  --muted: #8b8ba3;
+  --accent: #ff5c8a;
+  --accent2: #8a7bff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(60% 40% at 20% 0%, rgba(255, 92, 138, 0.12), transparent),
+    radial-gradient(60% 40% at 80% 100%, rgba(138, 123, 255, 0.12), transparent),
+    var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+  min-height: 100dvh;
+}
+
+#app { max-width: 540px; margin: 0 auto; padding: 16px 16px 90px; }
+
+.shell header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.shell header h1 { margin: 0; font-size: 22px; letter-spacing: 1px; }
+.logo {
+  width: 42px; height: 42px; display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 14px; font-size: 20px; color: white;
+}
+.logo.big { width: 84px; height: 84px; font-size: 40px; border-radius: 24px; margin-bottom: 12px; }
+.sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+main { display: flex; flex-direction: column; gap: 14px; }
+
+.card {
+  background: var(--card); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px; padding: 14px;
+}
+
+.kindrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.kindbtn, .symbtn, .symgridbtn, .primary, .del, nav button {
+  cursor: pointer; border: 1px solid rgba(255,255,255,0.12);
+  background: var(--card); color: var(--text);
+  border-radius: 12px; padding: 10px 14px; font-size: 14px;
+}
+.kindbtn.active, .symbtn.picked, .symgridbtn.picked {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-color: transparent; color: white; font-weight: 600;
+}
+.symgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.symgridbtn { font-size: 22px; text-align: center; padding: 12px 0; }
+.symrow { display: flex; gap: 8px; margin: 10px 0 16px; flex-wrap: wrap; }
+
+input, textarea {
+  width: 100%; background: var(--card); color: var(--text);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+  padding: 12px 14px; font-size: 15px; font-family: inherit;
+  margin-bottom: 10px; resize: vertical;
+}
+input:focus, textarea:focus { outline: 2px solid var(--accent2); border-color: transparent; }
+
+.primary {
+  width: 100%; padding: 13px; font-weight: 700; font-size: 15px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-color: transparent; color: white;
+}
+.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.glyph { display: flex; gap: 12px; align-items: flex-start; position: relative; }
+.glyph .sym { font-size: 30px; line-height: 1; }
+.glyph time { color: var(--muted); font-size: 12px; }
+.note { margin: 4px 0 2px; color: var(--text); }
+.tag { color: var(--accent2); font-weight: 600; font-size: 13px; }
+.del {
+  position: absolute; top: 10px; right: 10px;
+  border: none; background: none; color: var(--muted); font-size: 18px; padding: 2px 6px;
+}
+.del:hover { color: var(--accent); }
+
+.k-love { border-left: 3px solid var(--accent); }
+.k-mood { border-left: 3px solid #ffd166; }
+.k-memory { border-left: 3px solid var(--accent2); }
+.k-creativity { border-left: 3px solid #4dd9a8; }
+
+.empty { color: var(--muted); text-align: center; margin-top: 48px; }
+
+.avatar {
+  width: 64px; height: 64px; display: grid; place-items: center;
+  font-size: 26px; font-weight: 800; color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 20px; margin-bottom: 10px;
+}
+.profile { text-align: center; padding: 24px; }
+.profile h2 { margin: 0; }
+
+nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: min(540px - 24px, 100%); display: flex; gap: 8px;
+  padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+nav button { flex: 1; }
+nav button.active {
+  background: var(--card); border-color: var(--accent2); color: var(--accent2); font-weight: 700;
+}
+
+.onboard { min-height: 80dvh; display: flex; flex-direction: column; align-items: center; padding-top: 12vh; text-align: center; }
