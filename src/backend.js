@@ -99,7 +99,14 @@ export const backend = cfg
         });
       },
       findUser: async (glyphname) =>
-        (await j('/api/users')).find((r) => r.glyphname === glyphname) || null
+        (await j('/api/users')).find((r) => r.glyphname === glyphname) || null,
+      async heartbeat() {
+        if (!me.id) return;
+        await j('/api/users', { method: 'POST', body: JSON.stringify({ id: me.id, hb: true }) });
+      },
+      live(meId, after) {
+        return j('/api/live?me=' + encodeURIComponent(meId) + '&after=' + after);
+      }
     }
   : null;
 

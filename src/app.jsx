@@ -11,6 +11,8 @@ import { ShareSheet } from './share.jsx';
 import { ConnectSheet } from './connect.jsx';
 import { backend, getBackendConfig, myId } from './backend.js';
 
+const convOpen = (conv, openId) => openId && conv.split('|').includes(openId);
+
 export function App() {
   const [profile, setProfile] = useState(undefined);
   const [glyphs, setGlyphs] = useState([]);
@@ -26,8 +28,13 @@ export function App() {
   );
   const [liveMsg, setLiveMsg] = useState(null);
   const [connect, setConnect] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const [onlineIds, setOnlineIds] = useState({});
   const openRef = useRef(null);
   openRef.current = openChat;
+  const prevLikes = useRef({});
+  const prevWallKey = useRef('');
+  const msgCursor = useRef(Date.now() - 60000);
 
   const notify = (msg) => {
     setToast(msg);
@@ -60,7 +67,7 @@ export function App() {
     })();
   }, []);
 
-  // when profile exists + backend configured: register me, load data, poll for live updates
+  // the realtime engine: deltas every 2.5s — likes, new casts, DMs, presence — no reloads
   useEffect(() => {
     if (!profile || !backendOK || !backend) return;
     let alive = true;
@@ -72,13 +79,59 @@ export function App() {
         notify('Backend: ' + e.message);
       }
     })();
+
     const tick = setInterval(async () => {
-      if (document.visibilityState === 'hidden' || !alive) return;
+      if (document.visibilityState === 'hidden' || !alive || !backend) return;
       try {
-        await refresh();
-        setLiveMsg({ _t: Date.now() });
+        backend.heartbeat();
+        const meId = myId();
+        if (!meId) return;
+        const d = await backend.live(meId, msgCursor.current);
+        msgCursor.current = Date.now() - 1000;
+
+        // --- DMs, unread count, nudges ---
+        if (d.msgs && d.msgs.length) {
+          for (const m of d.msgs) {
+            const opened = convOpen(m.conv, openRef.current);
+            if (!opened) {
+              setUnread((n) => n + 1);
+              notify(`💬 ${m.sender_name || 'someone'}: ${m.text.slice(0, 34)}`);
+            }
+          }
+          setLiveMsg(d);
+        }
+
+        // --- wall (new casts/removed casts/likes merged without scroll jumps) ---
+        const wallKey = d.wall.map((r) => `${r.id}:${r.likes}`).join(',') + `#${d.wall.length}`;
+        if (wallKey !== prevWallKey.current) {
+          // new like on one of my glyph casts
+          for (const row of d.wall) {
+            if ((prevLikes.current[row.id] || 0) < (row.likes || 0) && row.author === meId) {
+              notify('♥ someone liked your glyph');
+              break;
+            }
+          }
+          prevLikes.current = Object.fromEntries(d.wall.map((r) => [r.id, r.likes || 0]));
+          prevWallKey.current = wallKey;
+          setGlyphs(d.wall.map((r) => ({
+            id: r.id, kind: r.kind, symbol: r.symbol, label: r.label,
+            note: r.note || undefined, likes: r.likes || 0,
+            created: new Date(r.created).getTime(),
+            who: { name: r.author_name || 'anon', glyphname: r.author_handle || '', symbol: r.author_symbol || '✦', rid: r.author }
+          })));
+        } else {
+          prevLikes.current = Object.fromEntries(d.wall.map((r) => [r.id, r.likes || 0]));
+        }
+
+        // --- presence dots ---
+        if (d.online) {
+          const map = {};
+          d.online.forEach((p) => (map[p.id] = true));
+          setOnlineIds(map);
+        }
       } catch {}
-    }, 4000);
+    }, 2500);
+
     return () => { alive = false; clearInterval(tick); };
   }, [profile, backendOK]);
 
@@ -113,12 +166,12 @@ export function App() {
   };
 
   const like = async (g) => {
+    setGlyphs((list) => list.map((x) => (x.id === g.id ? { ...x, likes: (x.likes || 0) + 1 } : x)));
     if (backendOK && backend) {
       await backend.likeWall(g.id);
     } else {
       await store.like(g.id);
     }
-    await refresh();
   };
 
   const removeGlyph = async (g) => {
@@ -172,6 +225,7 @@ export function App() {
       refreshContacts: refresh,
       connected: backendOK,
       liveMsg,
+      onlineIds,
       notify
     }),
     tab === 'pulse' && h(Pulse, { glyphs }),
@@ -219,10 +273,11 @@ export function App() {
         h('button', {
           key: t,
           class: tab === t ? 'active' : '',
-          onClick: () => setTab(t)
+          onClick: () => { if (t === 'chats') setUnread(0); setTab(t); }
         },
           h('span', { class: 'navicon' }, icon),
-          name
+          name,
+          t === 'chats' && unread > 0 ? h('span', { class: 'badge' }, unread) : null
         )
       )
     ),

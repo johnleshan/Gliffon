@@ -11,7 +11,7 @@ const REPLIES = [
   'bookmarking the feeling'
 ];
 
-export function Chats({ openContactId, setOpenContactId, refreshContacts, connected, liveMsg, notify }) {
+export function Chats({ openContactId, setOpenContactId, refreshContacts, connected, liveMsg, onlineIds, notify }) {
   const [contacts, setContacts] = useState([]);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
@@ -46,10 +46,10 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
   // incoming live messages: refresh the open conversation
   useEffect(() => {
     if (!liveMsg) return;
-    const convOk = connected
-      ? backend.convKey(openContactId) === liveMsg.conv
+    const has = connected
+      ? (liveMsg.msgs || []).some((m) => m.conv === backend.convKey(openContactId))
       : liveMsg.contactId === openContactId;
-    if (convOk) loadMsgs();
+    if (has) loadMsgs();
   }, [liveMsg]);
 
   const active = contacts.find((c) => c.id === openContactId);
@@ -138,7 +138,11 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
               h('button', { class: 'contact card', key: c.id, onClick: () => setOpenContactId(c.id) },
                 h('span', { class: 'avatar mini' }, c.symbol),
                 h('b', null, c.name),
-                connected ? h('span', { class: 'sub' }, `@${c.glyphname}`) : null,
+                connected && onlineIds[c.id]
+                  ? h('span', { class: 'dot online', title: 'online' }, '')
+                  : connected
+                    ? h('span', { class: 'dot', title: 'offline' }, '')
+                    : null,
                 h('span', { class: 'chev' }, '›')
               ))
          )
@@ -147,12 +151,12 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
       ? h(h.Fragment, null,
           h('div', { class: 'chathead' },
             h('button', { class: 'btn ghost', onClick: () => setOpenContactId(null) }, '‹'),
-            h('span', { class: 'avatar mini' }, active.symbol),
-            h('div', null,
-              h('b', null, active.name),
-              connected ? h('p', { class: 'sub' }, `@${active.glyphname} · live`) : null
-            )
-          ),
+      h('span', { class: 'avatar mini' }, active.symbol),
+      h('b', null, active.name),
+      h('span', {
+        class: (connected && onlineIds[active.id]) ? 'dot online big' : 'dot big'
+      })
+    ),
           h('div', { class: 'bubbles' },
             messages.map((m) =>
               h('div', { class: `bubble ${m.from}`, key: m.id },

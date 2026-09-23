@@ -212,6 +212,12 @@ body {
 
 /* ---------- chats ---------- */
 
+/* ---------- chats ---------- */
+
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #666; margin-left: auto; flex-shrink: 0; }
+.dot.online { background: #38d29f; box-shadow: 0 0 8px #38d29f; }
+.dot.big { width: 11px; height: 11px; margin-left: 0; }
+
 .chats { padding: 16px 16px calc(90px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; min-height: 100dvh; }
 
 .chathead {
