@@ -331,6 +331,14 @@ nav button.active .navicon {
   .reel-glyph { font-size: 96px; }
 }
 
+.offlinebar {
+  position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+  z-index: 6; width: min(560px, 100%);
+  background: rgba(255, 209, 102, 0.92); color: #43200b;
+  font-size: 12px; font-weight: 700; text-align: center;
+  padding: 6px 10px;
+}
+
 .sheet { max-width: 420px; }
 
 .share-sheet {

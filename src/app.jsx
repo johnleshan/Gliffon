@@ -95,14 +95,19 @@ export function App() {
 
   const cast = async (draft) => {
     const g = { id: uid(), created: Date.now(), likes: 0, ...draft };
-    if (backendOK && backend) {
-      await backend.addToWall(g);
-      await refresh();
-    } else {
-      await store.addGlyph(g);
-      await refresh();
+    try {
+      if (backendOK && backend) {
+        await backend.addToWall(g);
+        await refresh();
+      } else {
+        await store.addGlyph(g);
+        await refresh();
+      }
+      setTab('reels');
+      notify('Glyph cast ✓');
+    } catch (e) {
+      notify('Cast failed: ' + e.message);
     }
-    setTab('reels');
   };
 
   const like = async (g) => {
@@ -153,7 +158,9 @@ export function App() {
 
   return h('div', { class: 'shell' },
     tab === 'glyphs' && h(Composer, { onGlyph: cast }),
-    tab === 'reels' && h(Reels, {
+    !backendOK && tab === 'reels'
+      ? h('div', { class: 'offlinebar' }, 'Offline mode — casting stays on this device. Connect on the You tab to go live.')
+      : null,    tab === 'reels' && h(Reels, {
       glyphs, profile,
       onShare: setShareTarget,
       onRefresh: refresh,
