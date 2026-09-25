@@ -11,6 +11,13 @@ import { ShareSheet } from './share.jsx';
 import { ConnectSheet } from './connect.jsx';
 import { backend, getBackendConfig, myId } from './backend.js';
 
+const postLike = (wallId, userId) =>
+  fetch('/api/like', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ wall_id: wallId, user_id: userId })
+  }).then((r) => r.json());
+
 const convOpen = (conv, openId) => openId && conv.split('|').includes(openId);
 
 export function App() {
@@ -103,9 +110,14 @@ export function App() {
         // --- wall (new casts/removed casts/likes merged without scroll jumps) ---
         const wallKey = d.wall.map((r) => `${r.id}:${r.likes}`).join(',') + `#${d.wall.length}`;
         if (wallKey !== prevWallKey.current) {
-          // new like on one of my glyph casts
+          // who liked my glyph lately (name, not generic)
+          const likedIds = new Set((d.liked || []).map((l) => l.wall_id));
+          for (const l of d.liked || []) {
+            notify(`♥ ${l.liker_name || 'someone'} (@${l.liker_handle}) liked "${l.glyph_label}"`);
+          }
+
           for (const row of d.wall) {
-            if ((prevLikes.current[row.id] || 0) < (row.likes || 0) && row.author === meId) {
+            if ((prevLikes.current[row.id] || 0) < (row.likes || 0) && row.author === meId && !likedIds.has(row.id)) {
               notify('♥ someone liked your glyph');
               break;
             }
@@ -193,7 +205,12 @@ export function App() {
   const like = async (g) => {
     setGlyphs((list) => list.map((x) => (x.id === g.id ? { ...x, likes: (x.likes || 0) + 1 } : x)));
     if (backendOK && backend) {
-      await backend.likeWall(g.id);
+      const meId = myId();
+      if (meId) {
+        await postLike(g.id, meId);
+      } else {
+        await backend.likeWall(g.id);
+      }
     } else {
       await store.like(g.id);
     }

@@ -36,5 +36,17 @@ export default bind(async (req, res) => {
     where seen > now() - interval '3 minutes'
     limit 300`;
 
-  return json(res, { wall, msgs, online: presence });
+  // who recently liked MY wall posts (for the owner notification)
+  let liked = [];
+  if (me && after) {
+    liked = await sql`
+      select l.wall_id, l.created, u.name as liker_name, u.symbol as liker_symbol, u.glyphname as liker_handle, w.label as glyph_label
+      from likes l
+      join wall w on w.id = l.wall_id
+      join users u on u.id = l.user_id
+      where w.author = ${me} and l.created > ${after} and l.user_id <> ${me}
+      order by l.created desc limit 50`;
+  }
+
+  return json(res, { wall, msgs, liked, online: presence });
 });
