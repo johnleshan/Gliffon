@@ -32,6 +32,7 @@ export function Pulse({ glyphs }) {
     : null;
 
   return h('section', { class: 'pulse' },
+    h('p', { class: 'eyebrow' }, 'Signal report'),
     h('div', { class: 'statrow' },
       h('div', { class: 'stat card' }, h('b', null, glyphs.length), h('span', { class: 'sub' }, 'glyphs cast')),
       h('div', { class: 'stat card' }, h('b', null, `${streak}d`), h('span', { class: 'sub' }, 'streak')),
@@ -42,7 +43,10 @@ export function Pulse({ glyphs }) {
       h('div', { class: 'chart' },
         days.map((d, i) =>
           h('div', { class: 'barwrap', key: i },
-            h('div', { class: 'bar', style: `height:${Math.max(4, Math.round((d.count / max) * 100))}%` }),
+            h('div', {
+              class: 'bar',
+              style: `height:${Math.max(4, Math.round((d.count / max) * 100))}%;--i:${i}`
+            }),
             h('span', null, d.label)
           )
         )
@@ -50,11 +54,14 @@ export function Pulse({ glyphs }) {
     ),
     h('div', { class: 'card' },
       h('h3', { class: 'cardtitle' }, 'Glyph kinds'),
-      Object.entries(counts).map(([k, c]) =>
+      Object.entries(counts).map(([k, c], i) =>
         h('div', { class: 'krow', key: k },
           h('span', { class: 'kname' }, KIND_LABEL[k]),
           h('div', { class: 'ktrack' },
-            h('div', { class: `kfill k-${k}`, style: `width:${glyphs.length ? Math.round((c / glyphs.length) * 100) : 0}%` })
+            h('div', {
+              class: `kfill k-${k}`,
+              style: `width:${glyphs.length ? Math.round((c / glyphs.length) * 100) : 0}%;--i:${i}`
+            })
           ),
           h('b', { class: 'kcount' }, c)
         )

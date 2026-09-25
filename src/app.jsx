@@ -255,11 +255,13 @@ export function App() {
     }),
     tab === 'pulse' && h(Pulse, { glyphs }),
     tab === 'profile' && h('section', { class: 'profile' },
+      h('p', { class: 'eyebrow' }, 'Identity'),
       h('div', { class: 'card profilecard' },
-        h('span', { class: 'avatar glow' }, profile.glyphName.slice(0, 1).toUpperCase()),
+        h('div', { class: 'profileaura', 'aria-hidden': 'true' }),
+        h('span', { class: 'avatar glow pfsym' }, profile.symbol || profile.glyphName.slice(0, 1).toUpperCase()),
         h('h2', null, profile.name),
-        h('p', { class: 'sub' }, `glyph name: ${profile.glyphName}`),
-        h('p', { class: 'sub' }, `since ${new Date(profile.joined).toLocaleDateString()} · ${glyphs.length} glyphs`)
+        h('p', { class: 'sub gname' }, `@${profile.glyphName}`),
+        h('p', { class: 'sub' }, `since ${new Date(profile.joined).toLocaleDateString()} · ${glyphs.length} glyphs cast`)
       ),
       !backendOK
         ? h('button', { class: 'btn primary', onClick: () => setConnect(true) }, '🌐 Connect people (free)')

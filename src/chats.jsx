@@ -1,7 +1,17 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { store, uid } from './store.js';
 import { backend, myId } from './backend.js';
+
+const DAY_FMT = new Intl.DateTimeFormat([], { day: 'numeric', month: 'short' });
+const dayLabel = (t) => {
+  const d = new Date(t);
+  const today = new Date();
+  const yes = new Date(today.getTime() - 86400000);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yes.toDateString()) return 'Yesterday';
+  return DAY_FMT.format(d);
+};
 
 const REPLIES = [
   'felt that one ✦',
@@ -19,7 +29,8 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
   const [query, setQuery] = useState('');
   const [found, setFound] = useState(undefined);
   const [err, setErr] = useState('');
-
+  const [typingId, setTypingId] = useState(null);
+  const bubbleBox = useRef(null);
   const loadContacts = async () => {
     if (connected) {
       const rows = await backend.listUsers();
@@ -37,6 +48,7 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
   };
 
   useEffect(() => {
+    setTypingId(null);
     (async () => {
       await loadContacts();
       await loadMsgs();
@@ -52,6 +64,12 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
     if (has) loadMsgs();
   }, [liveMsg]);
 
+  // keep the stack glued to the newest bubble
+  useEffect(() => {
+    const el = bubbleBox.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, typingId]);
+
   const active = contacts.find((c) => c.id === openContactId);
 
   const send = async () => {
@@ -62,6 +80,7 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
       await backend.sendMessage(active.id, text);
       await loadMsgs();
     } else {
+      setTypingId(active.id); // optimistic "typing…" hint, cleared when the reply lands
       await store.addMessage({ id: uid(), contactId: active.id, from: 'me', text, created: Date.now() });
       await loadMsgs();
       setTimeout(async () => {
@@ -69,6 +88,7 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
           id: uid(), contactId: active.id, from: 'them',
           text: REPLIES[Math.floor(Math.random() * REPLIES.length)], created: Date.now()
         });
+        setTypingId((cur) => (cur === active.id ? null : cur));
         if (openContactId === active.id) loadMsgs();
       }, 1400);
     }
@@ -157,14 +177,33 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
         class: (connected && onlineIds[active.id]) ? 'dot online big' : 'dot big'
       })
     ),
-          h('div', { class: 'bubbles' },
-            messages.map((m) =>
-              h('div', { class: `bubble ${m.from}`, key: m.id },
-                m.text,
-                h('small', null, new Date(m.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-              )
-            ),
-            messages.length === 0 ? h('p', { class: 'empty' }, `say something to ${active.name}`) : null
+          h('div', { class: 'bubbles', ref: bubbleBox },
+            (() => {
+              let prevMsg = null;
+              return messages.map((m) => {
+                const t = new Date(m.created);
+                const newDay = !prevMsg || new Date(prevMsg.created).toDateString() !== t.toDateString();
+                const ditto = !newDay && prevMsg && prevMsg.from === m.from && m.created - prevMsg.created < 3 * 60000;
+                prevMsg = m;
+                const time = ` ${new Date(m.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                const tick = m.from === 'me' && Date.now() - m.created > 2200 ? ' ✓✓' : (m.from === 'me' ? ' ✓' : '');
+                return [
+                  newDay ? h('div', { class: 'daysep', key: 'd' + m.id }, dayLabel(m.created)) : null,
+                  h('div', {
+                    class: `bubble ${m.from}${ditto ? ' ditto' : ''}`,
+                    key: m.id
+                  },
+                    m.text,
+                    h('small', null, time.slice(1) + tick)
+                  )
+                ];
+              });
+            })(),
+            messages.length === 0 ? h('p', { class: 'empty' }, `say something to ${active.name}`) : null,
+            typingId === openContactId
+              ? h('div', { class: 'bubble them typing', 'aria-label': 'typing' },
+                  h('span', { class: 'tdot' }), h('span', { class: 'tdot' }), h('span', { class: 'tdot' }))
+              : null
           ),
           h('div', { class: 'composer-row' },
             h('input', {

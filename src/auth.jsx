@@ -31,8 +31,9 @@ export function Auth({ connected, onSignIn, onSignUp }) {
   const valid = handle.trim().length >= 2 && (isSignup ? name.trim().length >= 1 : true);
 
   return h('main', { class: 'onboard' },
+    h('div', { class: 'onboardorb', 'aria-hidden': 'true' }),
     h('span', { class: 'avatar glow', style: 'width:96px;height:96px;font-size:38px' }, '◆'),
-    h('h1', null, 'Gliffon'),
+    h('h1', { class: 'brand' }, 'Gliffon'),
     h('p', { class: 'sub' }, isSignup
       ? 'create your glyph identity — pick the badge of honour'
       : 'sign in with your glyph name'),
