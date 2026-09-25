@@ -300,6 +300,21 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 @keyframes castspeak { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 .symgrid { display: grid; grid-template-columns: repeat(6, 1fr) ; gap: 8px; position: relative; z-index: 1; }
+
+.idpreview {
+  display: flex; align-items: center; gap: 13px; position: relative; z-index: 1;
+  margin: 4px 0 16px; padding: 12px 15px;
+  border: 1px solid var(--line); border-radius: 17px;
+  background: linear-gradient(120deg, rgba(183, 138, 255, 0.09), rgba(255, 196, 107, 0.05));
+}
+.idpreview .avatar { flex: none; }
+.idpreviewtxt { display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0; }
+.idpreviewtxt strong { font-size: 16px; font-weight: 620; letter-spacing: -0.01em; }
+.idpreviewtxt .sub { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+.onboardbadge { transition: transform 0.3s var(--ease-spring), box-shadow 0.3s; }
+.onboardbadge:active { transform: scale(0.94); }
+
 .sym {
   cursor: pointer; font-size: 22px; text-align: center; padding: 11px 0;
   border: 1px solid var(--line); background: rgba(0, 0, 0, 0.22);

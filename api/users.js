@@ -19,11 +19,21 @@ export default bind(async (req, res) => {
       await sql`update users set seen = now() where id = ${u.id}`;
       return json(res, { ok: true });
     }
+
+    // Normalise identity: a display name is never allowed to be blank or handle-shaped,
+    // otherwise every interaction would degrade to "anon"/"someone".
+    const handle = String(u.glyphname || '').trim().replace(/^@/, '');
+    const bare = handle.toLowerCase();
+    let name = String(u.name || '').trim().replace(/^@/, '');
+    if (!name || name.toLowerCase() === bare) {
+      name = bare.replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
     await sql`
       insert into users (id, glyphname, name, symbol)
-      values (${u.id}, ${u.glyphname}, ${u.name}, ${u.symbol || '✦'})
-      on conflict (glyphname) do nothing`;
-    return json(res, { ok: true });
+      values (${u.id}, ${'@' + handle}, ${name}, ${u.symbol || '✦'})
+      on conflict (glyphname) do update set name = excluded.name, symbol = excluded.symbol`;
+    return json(res, { ok: true, name });
   }
 
   return json(res, { error: 'method' }, 405);

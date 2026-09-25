@@ -58,7 +58,12 @@ export function App() {
         id: r.id, kind: r.kind, symbol: r.symbol, label: r.label,
         note: r.note || undefined, likes: r.likes || 0,
         created: new Date(r.created).getTime(),
-        who: { name: (who[r.author] || {}).name || 'anon', symbol: (who[r.author] || {}).symbol || '✦', rid: r.author }
+        who: {
+          name: (who[r.author] || {}).name || (who[r.author] || {}).glyphname || 'unknown',
+          glyphname: (who[r.author] || {}).glyphname || '',
+          symbol: (who[r.author] || {}).symbol || '✦',
+          rid: r.author
+        }
       })));
     } else {
       setGlyphs(await store.listGlyphs());
@@ -112,7 +117,7 @@ export function App() {
             const opened = convOpen(m.conv, openRef.current);
             if (!opened) {
               setUnread((n) => n + 1);
-              notify(`💬 ${m.sender_name || 'someone'}: ${m.text.slice(0, 34)}`);
+              notify(`${m.sender_handle || '@' + (m.sender_name || 'someone')} · ${m.sender_name || 'someone'}: ${m.text.slice(0, 34)}`);
             }
           }
           setLiveMsg(d);
@@ -124,12 +129,14 @@ export function App() {
           // who liked my glyph lately (name, not generic)
           const likedIds = new Set((d.liked || []).map((l) => l.wall_id));
           for (const l of d.liked || []) {
-            notify(`♥ ${l.liker_name || 'someone'} (@${l.liker_handle}) liked "${l.glyph_label}"`);
+            const who = l.liker_handle || '@' + (l.liker_name || 'someone');
+            const whoName = l.liker_name && l.liker_name !== l.liker_handle ? ` (${l.liker_name})` : '';
+            notify(`${l.liker_symbol || '♥'} ${who}${whoName} liked your glyph "${l.glyph_label}"`);
           }
 
           for (const row of d.wall) {
             if ((prevLikes.current[row.id] || 0) < (row.likes || 0) && row.author === meId && !likedIds.has(row.id)) {
-              notify('♥ someone liked your glyph');
+              notify('♥ your glyph was liked');
               break;
             }
           }
@@ -139,7 +146,12 @@ export function App() {
             id: r.id, kind: r.kind, symbol: r.symbol, label: r.label,
             note: r.note || undefined, likes: r.likes || 0,
             created: new Date(r.created).getTime(),
-            who: { name: r.author_name || 'anon', glyphname: r.author_handle || '', symbol: r.author_symbol || '✦', rid: r.author }
+            who: {
+              name: r.author_name || r.author_handle || 'unknown',
+              glyphname: r.author_handle || '',
+              symbol: r.author_symbol || '✦',
+              rid: r.author
+            }
           })));
         } else {
           prevLikes.current = Object.fromEntries(d.wall.map((r) => [r.id, r.likes || 0]));

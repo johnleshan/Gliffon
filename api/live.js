@@ -20,7 +20,7 @@ export default bind(async (req, res) => {
   let msgs = [];
   if (me && after) {
     msgs = await sql`
-      select m.id, m.conv, m.sender, m.text, m.created, u.name as sender_name
+      select m.id, m.conv, m.sender, m.text, m.created, u.name as sender_name, u.glyphname as sender_handle, u.symbol as sender_symbol
       from messages m left join users u on u.id = m.sender
       where m.created > ${after} and m.conv like ${'%' + me + '%'}
       and m.sender <> ${me}
