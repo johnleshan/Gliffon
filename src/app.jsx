@@ -74,6 +74,17 @@ export function App() {
     })();
   }, []);
 
+  // if the session predates the auth system (ghost profile, no account id), force re-auth
+  useEffect(() => {
+    if (!profile || !backendOK) return;
+    if (!backend || !myId()) {
+      (async () => {
+        await store.clearProfile();
+        setProfile(undefined);
+      })();
+    }
+  }, [profile, backendOK]);
+
   // the realtime engine: deltas every 2.5s — likes, new casts, DMs, presence — no reloads
   useEffect(() => {
     if (!profile || !backendOK || !backend) return;
