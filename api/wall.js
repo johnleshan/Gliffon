@@ -1,7 +1,10 @@
 import { conn, bind, json, readBody, authUser, rate } from './_db.js';
+import { sendToUser } from './_push.js';
 
 export default bind(async (req, res) => {
   const sql = conn();
+  const url = new URL(req.url, 'http://x');
+  const action = url.searchParams.get('action') || '';
 
   if (req.method === 'GET') {
     const rows = await sql`
@@ -14,6 +17,36 @@ export default bind(async (req, res) => {
   const me = await authUser(sql, req);
   if (!me) return json(res, { error: 'sign in required' }, 401);
 
+  // Attributed like: POST /api/wall?action=like  body { wall_id }
+  if (req.method === 'POST' && action === 'like') {
+    if (!rate(req, res, { key: 'like', max: 120, windowMs: 60000 })) return;
+    const b = await readBody(req);
+    if (!b.wall_id) return json(res, { error: 'wall_id required' }, 400);
+
+    const exists = await sql`select 1 from likes where wall_id = ${b.wall_id} and user_id = ${me.id}`;
+    if (exists.length) return json(res, { ok: true, already: true });
+
+    const target = await sql`select author from wall where id = ${b.wall_id} limit 1`;
+    if (!target.length) return json(res, { error: 'not found' }, 404);
+    if (target[0].author === me.id) return json(res, { error: 'cannot like your own glyph' }, 400);
+
+    await sql`insert into likes (wall_id, user_id) values (${b.wall_id}, ${me.id})`;
+    await sql`update wall set likes = likes + 1 where id = ${b.wall_id}`;
+
+    const owner = await sql`
+      select w.label, u.glyphname from wall w
+      join users u on u.id = w.author where w.id = ${b.wall_id} limit 1`;
+    if (owner.length) {
+      sendToUser(sql, target[0].author, {
+        title: `${me.glyphname} liked your glyph`,
+        body: `${me.symbol} "${owner[0].label}"`,
+        icon: '/icon.svg',
+        data: { url: '/g/' + b.wall_id }
+      }).catch(() => {});
+    }
+    return json(res, { ok: true });
+  }
+
   if (req.method === 'POST') {
     if (!rate(req, res, { key: 'cast', max: 30, windowMs: 60000 })) return;
     const g = await readBody(req);
@@ -25,15 +58,7 @@ export default bind(async (req, res) => {
     return json(res, { ok: true });
   }
 
-  const url = new URL(req.url, 'http://x');
   const id = url.searchParams.get('id');
-
-  if (req.method === 'PATCH') {
-    // legacy anonymous bump kept for offline-sync compatibility, attributed likes go via /api/like
-    if (!rate(req, res, { key: 'likebump', max: 60, windowMs: 60000 })) return;
-    await sql`update wall set likes = likes + 1 where id = ${id}`;
-    return json(res, { ok: true });
-  }
 
   if (req.method === 'DELETE') {
     const rows = await sql`select author from wall where id = ${id}`;

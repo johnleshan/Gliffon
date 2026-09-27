@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { store, uid } from './store.js';
-import { backend } from './backend.js';
+import { backend, getMyId, at } from './backend.js';
 
 const DAY_FMT = new Intl.DateTimeFormat([], { day: 'numeric', month: 'short' });
 const dayLabel = (t) => {
@@ -23,7 +23,7 @@ const REPLIES = [
 
 export function Chats({
   profile, contacts, openChat, setOpenChat, unread, setUnread,
-  liveMsg, setLiveMsg, backendOK, backend, event
+  liveMsg, setLiveMsg, onlineIds, backendOK, backend, event
 }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
@@ -33,12 +33,26 @@ export function Chats({
   const [err, setErr] = useState('');
   const [typingId, setTypingId] = useState(null);
   const bubbleBox = useRef(null);
+  const myId = getMyId();
 
   const loadMsgs = async () => {
     if (!openChat) return setMessages([]);
     if (backendOK && backend) {
       const msgs = await backend.listMessages(openChat);
-      setMessages(msgs);
+      // Server rows use `sender`; the local store uses `from: 'me' | 'them'`.
+      // Normalising here keeps the bubble rendering single-sourced.
+      setMessages(
+        msgs.map((m) => ({
+          id: m.id,
+          text: m.text,
+          created: new Date(m.created).getTime(),
+          from: m.sender === myId ? 'me' : 'them',
+          senderHandle: m.sender_handle,
+          senderName: m.sender_name,
+          senderSymbol: m.sender_symbol,
+          senderId: m.sender
+        }))
+      );
     } else {
       setMessages(await store.listMessages(openChat));
     }
@@ -115,7 +129,7 @@ export function Chats({
                 h('span', { class: 'avatar mini' }, found.symbol),
                 h('div', null,
                   h('b', null, found.name),
-                  h('p', { class: 'sub' }, `@${found.glyphname}`)
+                  h('p', { class: 'sub' }, at(found.glyphname, found.name))
                 ),
                 h('button', {
                   class: 'btn primary',

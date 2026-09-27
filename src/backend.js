@@ -3,6 +3,7 @@
 
 const CONFIG_KEY = 'gliffon.backend';
 const TOKEN_KEY = 'gliffon.token';
+const UID_KEY = 'gliffon.uid';
 
 export const getBackendConfig = () => {
   try {
@@ -26,7 +27,23 @@ export const getToken = () => {
 };
 
 export const saveToken = (t) => localStorage.setItem(TOKEN_KEY, t);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+export const clearToken = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(UID_KEY);
+};
+
+// The authenticated user id, persisted so a page reload keeps working
+// before the session round-trip resolves.
+let myUserId = (() => {
+  try { return localStorage.getItem(UID_KEY); } catch { return null; }
+})();
+const setMyUserId = (id) => {
+  myUserId = id || null;
+  try {
+    if (id) localStorage.setItem(UID_KEY, id);
+    else localStorage.removeItem(UID_KEY);
+  } catch { /* storage unavailable */ }
+};
 
 let cfg = getBackendConfig();
 const isLocal = /(localhost|127\.0\.0\.1)/.test(location.hostname);
@@ -51,7 +68,7 @@ async function j(path, opts = {}) {
 export const backend = cfg
   ? {
       online: true,
-      // key-based signin (legacy accounts claim their key on first use)
+      // key-based signin
       async signIn(glyphname, key) {
         const { ok, user } = await j('/api/session', {
           method: 'POST',
@@ -59,33 +76,35 @@ export const backend = cfg
         });
         if (ok && user) {
           saveToken(key);
-          myUserId = user.id;
+          setMyUserId(user.id);
           return user;
         }
         return null;
       },
-      // signup: generates a new key for the user
+      // signup: the account key is generated once and never sent to the server
+      // in the clear (only its sha256 hash is stored).
       async signup(profile, key) {
-        const { ok, name } = await j('/api/users', {
+        const { ok, user } = await j('/api/users', {
           method: 'POST',
           body: JSON.stringify({ ...profile, key })
         });
-        if (ok) {
+        if (ok && user) {
           saveToken(key);
-          return { name };
+          setMyUserId(user.id);
+          return user;
         }
         throw new Error('signup failed');
       },
-      // exchange token for current user profile
+      // exchange the stored key for the current user profile
       async sessionUser() {
         const tok = getToken();
         if (!tok) return null;
         try {
           const { ok, user } = await j('/api/session', {
             method: 'POST',
-            body: JSON.stringify({ glyphname: '', key: tok })
+            body: JSON.stringify({ key: tok })
           });
-          if (ok && user) { myUserId = user.id; return user; }
+          if (ok && user) { setMyUserId(user.id); return user; }
           return null;
         } catch { return null; }
       },
@@ -100,7 +119,7 @@ export const backend = cfg
         await j('/api/wall', { method: 'POST', body: JSON.stringify(g) });
       },
       async likeWall(id) {
-        await j('/api/like', { method: 'POST', body: JSON.stringify({ wall_id: id }) });
+        await j('/api/wall?action=like', { method: 'POST', body: JSON.stringify({ wall_id: id }) });
       },
       async removeWall(id) {
         await j('/api/wall?id=' + id, { method: 'DELETE' });
@@ -121,8 +140,12 @@ export const backend = cfg
           })
         });
       },
-      findUser: async (glyphname) =>
-        (await j('/api/users')).find((r) => r.glyphname === glyphname) || null,
+      findUser: async (glyphname) => {
+        const want = String(glyphname || '').trim().replace(/^@/, '').toLowerCase();
+        if (!want) return null;
+        const rows = await j('/api/users');
+        return rows.find((r) => String(r.glyphname || '').replace(/^@/, '').toLowerCase() === want) || null;
+      },
       async heartbeat() {
         if (!myUserId) return;
         await j('/api/users', { method: 'POST', body: JSON.stringify({ hb: true, id: myUserId }) });
@@ -140,40 +163,47 @@ export const backend = cfg
           body: JSON.stringify({ id: crypto.randomUUID ? crypto.randomUUID() : uid2(), text })
         });
       },
-      // follows
+      // follows / blocks / reports  ->  /api/social
       async listFollows(type = 'following') {
-        return await j('/api/follows?type=' + type);
+        return await j('/api/social?type=' + type);
       },
       async follow(glyphname) {
-        await j('/api/follows', { method: 'POST', body: JSON.stringify({ glyphname }) });
+        await j('/api/social?action=follow', { method: 'POST', body: JSON.stringify({ glyphname }) });
       },
       async unfollow(glyphname) {
-        await j('/api/follows', { method: 'DELETE', body: JSON.stringify({ glyphname }) });
+        await j('/api/social?action=unfollow', { method: 'DELETE', body: JSON.stringify({ glyphname }) });
       },
-      // blocks
       async listBlocks() {
-        return await j('/api/blocks');
+        return await j('/api/social?type=blocks');
       },
       async block(glyphname) {
-        await j('/api/blocks', { method: 'POST', body: JSON.stringify({ glyphname }) });
+        await j('/api/social?action=block', { method: 'POST', body: JSON.stringify({ glyphname }) });
       },
       async unblock(glyphname) {
-        await j('/api/blocks', { method: 'DELETE', body: JSON.stringify({ glyphname }) });
+        await j('/api/social?action=unblock', { method: 'DELETE', body: JSON.stringify({ glyphname }) });
       },
-      // reports
       async report(kind, targetId, reason = '') {
-        await j('/api/reports', { method: 'POST', body: JSON.stringify({ id: uid(), kind, target_id: targetId, reason }) });
+        await j('/api/social?action=report', {
+          method: 'POST',
+          body: JSON.stringify({ id: uid2(), kind, target_id: targetId, reason })
+        });
       },
       // events
       async event(name, meta = {}) {
         await j('/api/events', { method: 'POST', body: JSON.stringify({ name, meta }) });
       },
+      async stats() {
+        return await j('/api/events');
+      },
       // push subs
       async pushSubscribe(sub) {
-        await j('/api/push-subs', { method: 'POST', body: JSON.stringify(sub) });
+        await j('/api/push', { method: 'POST', body: JSON.stringify(sub) });
       },
       async pushUnsubscribe(endpoint) {
-        await j('/api/push-subs', { method: 'DELETE', body: JSON.stringify({ endpoint }) });
+        await j('/api/push', { method: 'DELETE', body: JSON.stringify({ endpoint }) });
+      },
+      async pushTest(title, body) {
+        await j('/api/push?action=test', { method: 'POST', body: JSON.stringify({ title, body }) });
       },
       signOut() {
         clearToken();
@@ -186,9 +216,15 @@ function uid2() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
-let myUserId = null;
-export const setMyId = (id) => { myUserId = id; };
+export const setMyId = (id) => setMyUserId(id);
 export const getMyId = () => myUserId;
+
+// Handles are stored in the DB with a leading "@", so display sites must not
+// prepend another one. This is the single place that normalises it.
+export const at = (handle, fallback = '') => {
+  const s = String(handle || fallback || '').trim().replace(/^@+/, '');
+  return s ? '@' + s : '';
+};
 
 export const getAuth = () => ({
   token: getToken(),

@@ -10,6 +10,11 @@ export default bind(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     const conv = url.searchParams.get('conv');
     if (!conv) return json(res, { error: 'conv required' }, 400);
+    // confirm the caller is actually a participant before reading anything
+    const [a, b] = conv.split('|');
+    if (!a || !b || (a !== me.id && b !== me.id)) {
+      return json(res, { error: 'not your conversation' }, 403);
+    }
     const rows = await sql`
       select m.*, u.name as sender_name, u.symbol as sender_symbol, u.glyphname as sender_handle
       from messages m left join users u on u.id = m.sender

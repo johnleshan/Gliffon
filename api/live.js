@@ -5,8 +5,9 @@ export default bind(async (req, res) => {
   const me = await authUser(sql, req);
   const url = new URL(req.url, 'http://x');
 
-  // For backwards compat with unauthenticated initial load
-  const meId = url.searchParams.get('me') || (me && me.id);
+  // Identity is always server-derived from the auth token. We never trust a
+  // caller-supplied ?me= param, otherwise anyone could read another user's DMs.
+  const meId = me && me.id;
   const afterMs = parseInt(url.searchParams.get('after') || '0', 10);
   const after = afterMs ? new Date(afterMs).toISOString() : null;
 

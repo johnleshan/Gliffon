@@ -1,6 +1,7 @@
 import { h } from 'preact';
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { KINDS } from './store.js';
+import { at } from './backend.js';
 
 export function Reels({
   glyphs, like, onShare, openComments, comments, addComment, commentsOpen,
@@ -66,7 +67,7 @@ export function Reels({
               (KINDS.find((k) => k.kind === g.kind) || {}).name || 'Glyph'),
             h('div', { class: 'metaline' },
               h('span', { class: 'who' },
-                (g.who && g.who.glyphname) ? '@' + g.who.glyphname : (g.who && g.who.name) || 'unknown',
+                at(g.who && g.who.glyphname, g.who && g.who.name) || 'unknown',
                 g.who && onlineIds[g.who.rid] && h('span', { class: 'dot online' })
               ),
               h('b', null, ` ${g.label}`)
@@ -78,7 +79,7 @@ export function Reels({
               h('span', { class: 'avatar' }, c.author_symbol || '✦'),
               h('div', { class: 'comment-body' },
                 h('div', { class: 'comment-header' },
-                  h('span', { class: 'who' }, '@' + (c.author_handle || c.author_name || 'unknown')),
+                  h('span', { class: 'who' }, at(c.author_handle, c.author_name) || 'unknown'),
                   h('span', { class: 'time sub' }, new Date(c.created).toLocaleTimeString())
                 ),
                 h('p', null, c.text)

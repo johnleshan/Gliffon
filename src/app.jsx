@@ -8,7 +8,7 @@ import { Pulse } from './pulse.jsx';
 import { Reels } from './reels.jsx';
 import { Chats } from './chats.jsx';
 import { ShareSheet } from './share.jsx';
-import { backend, getBackendConfig, getAuth, setMyId, getMyId } from './backend.js';
+import { backend, getBackendConfig, getAuth, setMyId, getMyId, at } from './backend.js';
 
 const convOpen = (conv, openId) => openId && conv.split('|').includes(openId);
 
@@ -221,7 +221,7 @@ export function App() {
             const opened = convOpen(m.conv, openRef.current);
             if (!opened) {
               setUnread((n) => n + 1);
-              notify(`${m.sender_handle || '@' + (m.sender_name || 'someone')} · ${m.sender_name || 'someone'}: ${m.text.slice(0, 34)}`);
+              notify(`${at(m.sender_handle, m.sender_name)} · ${m.sender_name || 'someone'}: ${m.text.slice(0, 34)}`);
             }
           }
           setLiveMsg(d);
@@ -232,10 +232,10 @@ export function App() {
         if (wallKey !== prevWallKey.current) {
           const likedIds = new Set((d.liked || []).map((l) => l.wall_id));
           for (const l of d.liked || []) {
-            const who = l.liker_handle || '@' + (l.liker_name || 'someone');
+            const who = at(l.liker_handle, l.liker_name);
             const whoName = l.liker_name && l.liker_name !== l.liker_handle ? ` (${l.liker_name})` : '';
             notify(`${l.liker_symbol || '♥'} ${who}${whoName} liked your glyph "${l.glyph_label}"`);
-            pushActivity(`${l.liker_handle} liked "${l.glyph_label}"`, l.created);
+            pushActivity(`${at(l.liker_handle, l.liker_name)} liked "${l.glyph_label}"`, l.created);
           }
           for (const row of d.wall) {
             if ((prevLikes.current[row.id] || 0) < (row.likes || 0) && row.author === meId && !likedIds.has(row.id)) {
@@ -266,8 +266,8 @@ export function App() {
             const key = c.wall_id + '|' + c.created;
             if (!commentCursors.current[key]) {
               commentCursors.current[key] = true;
-              notify(`${c.commenter_handle || '@' + c.commenter_name} commented on "${c.glyph_label}": ${c.comment_text.slice(0, 40)}`);
-              pushActivity(`${c.commenter_handle} commented on "${c.glyph_label}"`, c.created);
+              notify(`${at(c.commenter_handle, c.commenter_name)} commented on "${c.glyph_label}": ${c.comment_text.slice(0, 40)}`);
+              pushActivity(`${at(c.commenter_handle, c.commenter_name)} commented on "${c.glyph_label}"`, c.created);
             }
           }
         }
@@ -313,36 +313,46 @@ export function App() {
   };
 
   const toggleFollow = async (u) => {
+    if (!backend || !backendOK) { notify('Sign in to follow'); return; }
     if (following.has(u.id)) {
       await backend.unfollow(u.glyphname);
       setFollowing((s) => { const n = new Set(s); n.delete(u.id); return n; });
-      notify(`Unfollowed @${u.glyphname}`);
+      notify(`Unfollowed ${at(u.glyphname)}`);
     } else {
       await backend.follow(u.glyphname);
       setFollowing((s) => { const n = new Set(s); n.add(u.id); return n; });
-      notify(`Followed @${u.glyphname}`);
+      notify(`Followed ${at(u.glyphname)}`);
+      pushActivity(`You followed ${at(u.glyphname, u.name)}`);
+      if (backend.event) backend.event('follow', { target: at(u.glyphname) }).catch(() => {});
     }
   };
 
   const blockUser = async (u) => {
+    if (!backend || !backendOK) { notify('Sign in to block'); return; }
     await backend.block(u.glyphname);
     await refresh();
-    notify(`Blocked @${u.glyphname}`);
+    setFollowing((s) => { const n = new Set(s); n.delete(u.id); return n; });
+    notify(`Blocked ${at(u.glyphname)}`);
   };
 
   const unblockUser = async (u) => {
+    if (!backend || !backendOK) return;
     await backend.unblock(u.glyphname);
     await refresh();
-    notify(`Unblocked @${u.glyphname}`);
+    notify(`Unblocked ${at(u.glyphname)}`);
   };
 
   const reportGlyph = async (g, reason) => {
+    if (!backend || !backendOK) { notify('Sign in to report'); return; }
     await backend.report('glyph', g.id, reason);
+    if (backend.event) backend.event('report', { kind: 'glyph' }).catch(() => {});
     notify('Reported — thank you');
   };
 
   const reportUser = async (u, reason) => {
+    if (!backend || !backendOK) { notify('Sign in to report'); return; }
     await backend.report('user', u.id, reason);
+    if (backend.event) backend.event('report', { kind: 'user' }).catch(() => {});
     notify('Reported — thank you');
   };
 
@@ -401,9 +411,11 @@ export function App() {
     });
   }
 
+  // Blocked users' glyphs never reach the feed, in either filter mode.
+  const visibleGlyphs = glyphs.filter((g) => !blockedUsers.some((b) => b.id === g.who.rid));
   const filteredGlyphs = feedFilter === 'following'
-    ? glyphs.filter((g) => following.has(g.who.rid))
-    : glyphs;
+    ? visibleGlyphs.filter((g) => following.has(g.who.rid))
+    : visibleGlyphs;
 
   return h('div', { id: 'app' },
     h('header', { class: 'appbar' },
@@ -452,7 +464,7 @@ export function App() {
 
     tab === 'chats' && h(Chats, {
       profile, contacts, openChat, setOpenChat, unread, setUnread,
-      liveMsg, setLiveMsg, backendOK, backend, event
+      liveMsg, setLiveMsg, onlineIds, backendOK, backend, event
     }),
 
     tab === 'pulse' && h(Pulse, {
@@ -495,7 +507,7 @@ h('label', null, 'Reminders', h('select', {
             : blockedUsers.map((u) =>
                 h('div', { class: 'blocked-item', key: u.id },
                   h('span', { class: 'avatar' }, u.symbol),
-                  h('span', null, '@' + u.glyphname),
+                  h('span', null, at(u.glyphname)),
                   h('button', { class: 'btn ghost', onClick: () => unblockUser(u) }, 'Unblock')
                 )
               )

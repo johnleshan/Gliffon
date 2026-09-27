@@ -1,34 +1,70 @@
-import { conn, bind, json } from './_db.js';
+import { conn, bind } from './_db.js';
 
+const esc = (v) =>
+  String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+// Server-rendered share page. Social crawlers do not execute JS, so the OG tags
+// have to exist in the initial HTML response. Everything interpolated here is
+// user-authored, so it is escaped before it reaches the document.
 export default bind(async (req, res) => {
-  const { id } = req.params || {};
-  if (!id) return json(res, { error: 'id required' }, 400);
-  const sql = conn();
-  const wall = await sql`
-    select w.*, u.name as author_name, u.symbol as author_symbol, u.glyphname as author_handle
-    from wall w left join users u on u.id = w.author
-    where w.id = ${id} limit 1`;
-  if (!wall.length) return json(res, { error: 'not found' }, 404);
-  const w = wall[0];
-  const html = `<!doctype html>
+  const url = new URL(req.url, 'http://x');
+  const id = url.searchParams.get('id');
+  if (!id) {
+    res.statusCode = 400;
+    res.setHeader('content-type', 'text/html; charset=utf-8');
+    return res.end('<!doctype html><meta charset="utf-8"><p>Missing glyph id.</p>');
+  }
+
+  let row = null;
+  try {
+    const sql = conn();
+    const rows = await sql`
+      select w.id, w.label, w.symbol, w.note, w.likes, w.created,
+             u.name as author_name, u.symbol as author_symbol, u.glyphname as author_handle
+      from wall w left join users u on u.id = w.author
+      where w.id = ${id} limit 1`;
+    row = rows[0] || null;
+  } catch {
+    row = null;
+  }
+
+  const site = 'https://gliffon.vercel.app';
+  const title = row ? `${row.symbol} ${row.label || 'A glyph'}` : 'Gliffon';
+  const who = row ? row.author_handle || row.author_name || 'someone' : 'Gliffon';
+  const desc = row
+    ? `${who} cast this glyph on Gliffon · ${row.likes || 0} likes`
+    : 'Express emotions, memories and creativity through glyphs.';
+
+  res.setHeader('content-type', 'text/html; charset=utf-8');
+  res.end(`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta property="og:title" content="${w.label || 'Gliffon Glyph'}">
-    <meta property="og:description" content="${w.author_name || 'shared a glyph'} on Gliffon">
-    <meta property="og:url" content="https://gliffon.vercel.app/g/${id}">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${esc(title)} · Gliffon</title>
+    <meta name="description" content="${esc(desc)}">
+    <meta property="og:site_name" content="Gliffon">
+    <meta property="og:title" content="${esc(title)}">
+    <meta property="og:description" content="${esc(desc)}">
+    <meta property="og:url" content="${esc(site + '/g/' + id)}">
     <meta property="og:type" content="article">
-    <meta property="og:image" content="https://gliffon.vercel.app/icon.svg">
-    <meta name="twitter:card" content="summary_large_image">
-    <title>${w.label || 'Gliffon Glyph'}</title>
+    <meta property="og:image" content="${esc(site + '/icon.svg')}">
+    <meta name="twitter:card" content="summary">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
   </head>
-  <body style="font-family:system-ui,Arial,sans-serif;padding:2rem;text-align:center;">
-    <h1>${w.label || 'A Glyph'}</h1>
-    <div style="font-size:4rem;">${w.symbol}</div>
-    <p>${w.author_name || 'shared on Gliffon'}</p>
-    <p style="margin-top:2rem;"><a href="https://gliffon.vercel.app" style="color:#666;">gliffon.vercel.app</a></p>
+  <body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0e0a0f;color:#f6f1f7;font-family:system-ui,-apple-system,Segoe UI,sans-serif;text-align:center;padding:2rem">
+    <main>
+      <div style="font-size:5rem;line-height:1">${esc(row ? row.symbol : '◈')}</div>
+      <h1 style="font-size:1.75rem;margin:1rem 0 .35rem">${esc(row ? row.label || 'A glyph' : 'This glyph is no longer available')}</h1>
+      <p style="color:#c9a227;margin:0 0 .35rem">${esc(row ? (row.author_symbol || '✦') + ' ' + who : 'Gliffon')}</p>
+      <p style="color:#9a91a5;margin:0">${esc(row ? row.likes + ' likes' : 'Express emotions, memories and creativity through glyphs.')}</p>
+      <a href="${esc(site)}" style="display:inline-block;margin-top:1.75rem;padding:.7rem 1.4rem;border-radius:999px;background:#b3122f;color:#fff;text-decoration:none;font-weight:600">Cast yours on Gliffon</a>
+    </main>
   </body>
-</html>`;
-  res.setHeader('content-type', 'text/html');
-  res.end(html);
+</html>`);
 });

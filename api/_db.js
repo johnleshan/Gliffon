@@ -52,8 +52,10 @@ export const hashToken = (t) => createHash('sha256').update(String(t)).digest('h
 export const newToken = () => randomBytes(24).toString('base64url');
 
 // The caller's account, verified by secret token. Null = anonymous.
-export async function authUser(sql, req) {
-  const tok = req.headers['x-auth-token'];
+// An explicit `key` overrides the header, so the session endpoint can verify a
+// key from a request body without trusting the header/identity combination.
+export async function authUser(sql, req, key) {
+  const tok = key || req.headers['x-auth-token'];
   if (!tok) return null;
   const rows = await sql`select * from users where token_hash = ${hashToken(tok)} limit 1`;
   return rows[0] || null;

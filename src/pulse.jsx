@@ -1,5 +1,6 @@
 import { h, Fragment } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
+import { at } from './backend.js';
 
 const KIND_LABEL = { love: 'Love', mood: 'Mood', memory: 'Memory', creativity: 'Creativity' };
 
@@ -8,8 +9,19 @@ export function Pulse({
   following, blockedUsers, toggleFollow, blockUser, unblockUser,
   backendOK, backend, event, pushEnabled, setPushEnabled, subscribePush
 }) {
-  const [view, setView] = useState('activity'); // 'activity' | 'following' | 'blocked' | 'stats'
+  const [view, setView] = useState('activity'); // 'activity' | 'following' | 'blocked' | 'stats' | 'push'
   const [search, setSearch] = useState('');
+  const [stats, setStats] = useState(null);
+
+  // Real aggregates from the server (own activity only), used by the stats view.
+  useEffect(() => {
+    if (view !== 'stats' || !backendOK || !backend) return;
+    let alive = true;
+    backend.stats()
+      .then((s) => { if (alive) setStats(s); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [view, backendOK]);
 
   const now = Date.now();
 
@@ -59,6 +71,24 @@ export function Pulse({
     ),
 
     view === 'stats' && h(Fragment, {},
+      stats && h('div', { class: 'card' },
+        h('h3', { class: 'cardtitle' }, 'Your signal'),
+        h('div', { class: 'statrow' },
+          h('div', { class: 'stat' }, h('b', null, stats.totals.likes_received), h('span', { class: 'sub' }, 'likes received')),
+          h('div', { class: 'stat' }, h('b', null, stats.totals.comments_received), h('span', { class: 'sub' }, 'comments')),
+          h('div', { class: 'stat' }, h('b', null, stats.totals.followers), h('span', { class: 'sub' }, 'followers'))
+        ),
+        stats.byName && stats.byName.length
+          ? h('div', { class: 'krow-list' },
+              stats.byName.slice(0, 6).map((e) =>
+                h('div', { class: 'krow', key: e.name },
+                  h('span', { class: 'kname' }, e.name.replace(/_/g, ' ')),
+                  h('b', { class: 'kcount' }, e.count)
+                )
+              )
+            )
+          : h('p', { class: 'sub' }, 'No activity recorded yet.')
+      ),
       h('div', { class: 'card' },
         h('h3', { class: 'cardtitle' }, 'Last 7 days'),
         h('div', { class: 'chart' },
@@ -107,11 +137,11 @@ export function Pulse({
       h('div', { class: 'searchbar' },
         h('input', { class: 'field', placeholder: 'Find people…', value: search, onInput: (e) => setSearch(e.currentTarget.value) })
       ),
-      contacts.filter((u) => u.glyphname.toLowerCase().includes(search.toLowerCase())).map((u) =>
+      contacts.filter((u) => String(u.glyphname || '').toLowerCase().includes(search.replace(/^@/, '').toLowerCase())).map((u) =>
         h('div', { class: 'follow-row', key: u.id },
           h('span', { class: 'avatar' + (onlineIds[u.id] ? ' online' : '') }, u.symbol),
           h('div', { class: 'follow-info' },
-            h('b', null, '@' + u.glyphname),
+            h('b', null, at(u.glyphname, u.name)),
             h('span', { class: 'sub' }, u.name)
           ),
           h('button', {
@@ -129,7 +159,7 @@ export function Pulse({
             h('div', { class: 'blocked-item', key: u.id },
               h('span', { class: 'avatar' }, u.symbol),
               h('div', { class: 'follow-info' },
-                h('b', null, '@' + u.glyphname),
+                h('b', null, at(u.glyphname, u.name)),
                 h('span', { class: 'sub' }, u.name)
               ),
               h('button', { class: 'btn ghost', onClick: () => unblockUser(u) }, 'Unblock')
