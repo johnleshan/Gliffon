@@ -1,4 +1,4 @@
-import { conn, bind, json } from './_db.js';
+import { conn, bind, json, readBody, hashToken, rate } from './_db.js';
 
 export default bind(async (req, res) => {
   const sql = conn();
@@ -9,16 +9,14 @@ export default bind(async (req, res) => {
   }
 
   if (req.method === 'POST') {
-    const u = await new Promise((ok, err) => {
-      let b = '';
-      req.on('data', (c) => (b += c));
-      req.on('end', () => { try { ok(JSON.parse(b)); } catch (e) { err(new Error('bad json')); } });
-    });
+    const u = await readBody(req);
     if (u.hb && u.id) {
       // presence heartbeat
       await sql`update users set seen = now() where id = ${u.id}`;
       return json(res, { ok: true });
     }
+    if (!rate(req, res, { key: 'signup', max: 10, windowMs: 60000 })) return;
+    if (!u.key) return json(res, { error: 'account key required' }, 400);
 
     // Normalise identity: a display name is never allowed to be blank or handle-shaped,
     // otherwise every interaction would degrade to "anon"/"someone".
@@ -30,8 +28,8 @@ export default bind(async (req, res) => {
     }
 
     await sql`
-      insert into users (id, glyphname, name, symbol)
-      values (${u.id}, ${'@' + handle}, ${name}, ${u.symbol || '✦'})
+      insert into users (id, glyphname, name, symbol, token_hash)
+      values (${u.id}, ${'@' + handle}, ${name}, ${u.symbol || '✦'}, ${hashToken(u.key)})
       on conflict (glyphname) do update set name = excluded.name, symbol = excluded.symbol`;
     return json(res, { ok: true, name });
   }

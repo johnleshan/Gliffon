@@ -1,19 +1,22 @@
 import { h } from 'preact';
-import { useState, useRef } from 'preact/hooks';
+import { useState, useRef, useEffect } from 'preact/hooks';
 import { KINDS } from './store.js';
 
-// Cinematic reel staging: presentational scroll tracking (active index),
-// optimistic "liked" visual pop, and a typographic advancement counter.
-// All data flow (glyphs, onLike, onShare) is untouched.
-export function Reels({ glyphs, profile, onShare, onLike }) {
+export function Reels({
+  glyphs, like, onShare, openComments, comments, addComment, commentsOpen,
+  onlineIds, meId, profile, following, toggleFollow, blockUser,
+  reportGlyph, reportUser, event
+}) {
   const [active, setActive] = useState(0);
   const [liked, setLiked] = useState({});
+  const [commentText, setCommentText] = useState({});
+  const [menuFor, setMenuFor] = useState(null);
   const box = useRef(null);
   const ticking = useRef(false);
 
   const likeFx = (g) => {
     setLiked((m) => ({ ...m, [g.id]: true }));
-    onLike(g);
+    like(g);
   };
 
   const onScroll = () => {
@@ -27,6 +30,8 @@ export function Reels({ glyphs, profile, onShare, onLike }) {
       setActive((prev) => (prev === i ? prev : i));
     });
   };
+
+  const cs = commentsOpen ? (comments[commentsOpen] || []) : [];
 
   if (glyphs.length === 0) {
     return h('div', { class: 'reels-empty' },
@@ -42,8 +47,11 @@ export function Reels({ glyphs, profile, onShare, onLike }) {
       h('span', { class: 'reelcount-line' }),
       h('span', { class: 'reelcount-total' }, String(glyphs.length).padStart(2, '0'))
     ),
-    glyphs.map((g, i) =>
-      h('section', { class: `reel k-${g.kind}` + (i === active ? ' is-active' : ''), key: g.id },
+    glyphs.map((g, i) => {
+      const isMe = !!(g.who && g.who.rid && g.who.rid === meId);
+      const isFollowing = !!(g.who && following.has(g.who.rid));
+
+      return h('section', { class: `reel k-${g.kind}` + (i === active ? ' is-active' : ''), key: g.id },
         h('div', { class: 'reel-back', 'aria-hidden': 'true' }),
         h('div', { class: 'reel-orb', 'aria-hidden': 'true' }),
         h('div', { class: 'reel-orb orb2', 'aria-hidden': 'true' }),
@@ -57,10 +65,32 @@ export function Reels({ glyphs, profile, onShare, onLike }) {
             h('span', { class: 'kicker' },
               (KINDS.find((k) => k.kind === g.kind) || {}).name || 'Glyph'),
             h('div', { class: 'metaline' },
-              h('span', { class: 'who' }, (g.who && g.who.glyphname) || (g.who && g.who.name) || profile.glyphName),
+              h('span', { class: 'who' },
+                (g.who && g.who.glyphname) ? '@' + g.who.glyphname : (g.who && g.who.name) || 'unknown',
+                g.who && onlineIds[g.who.rid] && h('span', { class: 'dot online' })
+              ),
               h('b', null, ` ${g.label}`)
             ),
             g.note ? h('p', { class: 'note' }, g.note) : null
+          ),
+          commentsOpen === g.id && h('div', { class: 'comment-panel' },
+            cs.map((c) => h('div', { class: 'comment', key: c.id },
+              h('span', { class: 'avatar' }, c.author_symbol || '✦'),
+              h('div', { class: 'comment-body' },
+                h('div', { class: 'comment-header' },
+                  h('span', { class: 'who' }, '@' + (c.author_handle || c.author_name || 'unknown')),
+                  h('span', { class: 'time sub' }, new Date(c.created).toLocaleTimeString())
+                ),
+                h('p', null, c.text)
+              )
+            )),
+            h('form', { class: 'comment-form', onSubmit: (e) => { e.preventDefault(); addComment(g, commentText[g.id] || ''); setCommentText((p) => ({ ...p, [g.id]: '' })); } },
+              h('input', {
+                class: 'field', placeholder: 'Add a comment…', value: commentText[g.id] || '',
+                onInput: (e) => setCommentText((p) => ({ ...p, [g.id]: e.currentTarget.value }))
+              }),
+              h('button', { class: 'btn primary', type: 'submit' }, 'Post')
+            )
           )
         ),
         h('div', { class: 'rail' },
@@ -72,14 +102,42 @@ export function Reels({ glyphs, profile, onShare, onLike }) {
             h('span', { class: 'heart' }, '♥'),
             h('small', { class: 'count', key: g.likes || 0 }, g.likes || 0)
           ),
+          h('button', {
+            class: 'act' + (commentsOpen === g.id ? ' on' : ''),
+            'aria-label': 'open comments',
+            onClick: () => openComments(g)
+          },
+            h('span', null, '💬'),
+            h('small', { class: 'count' }, (comments[g.id] || []).length)
+          ),
+          g.who && !isMe && h('button', {
+            class: 'act' + (isFollowing ? ' following' : ''),
+            'aria-label': isFollowing ? 'unfollow' : 'follow',
+            onClick: () => toggleFollow(g.who)
+          }, isFollowing ? '✓' : '➕'),
           h('button', { class: 'act share', 'aria-label': 'share glyph', onClick: () => onShare(g) },
             h('span', null, '⤴')
           ),
+          h('button', {
+            class: 'act more', 'aria-label': 'more options',
+            onClick: () => setMenu(menuFor === g.id ? null : g.id)
+          }, h('span', null, '⋯')),
           h('small', { class: 'kindlabel' },
             (KINDS.find((k) => k.kind === g.kind) || {}).name || 'Glyph'
+          ),
+          menuFor === g.id && h('div', { class: 'reelmenu glass' },
+            h('button', { class: 'mi', onClick: () => { navigator.clipboard?.writeText(location.origin + '/g/' + g.id); setMenu(null); event('copy_link', { glyphId: g.id }); } },
+              'Copy link'),
+            h('button', { class: 'mi', onClick: () => { reportGlyph(g, 'misleading or spam'); setMenu(null); } },
+              'Report glyph'),
+            g.who && !isMe && h('button', {
+              class: 'mi danger', onClick: () => { blockUser({ id: g.who.rid, glyphname: (g.who.glyphname || '').replace('@', '') }); setMenu(null); }
+            }, 'Block ' + (g.who.glyphname || g.who.name)),
+            g.who && !isMe && h('button', { class: 'mi', onClick: () => { reportUser({ id: g.who.rid }, 'harassment or spam'); setMenu(null); } },
+              'Report ' + (g.who.glyphname || g.who.name))
           )
         )
-      )
-    )
+      );
+    })
   );
 }

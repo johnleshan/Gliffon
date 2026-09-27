@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { store, uid } from './store.js';
-import { backend, myId } from './backend.js';
+import { backend } from './backend.js';
 
 const DAY_FMT = new Intl.DateTimeFormat([], { day: 'numeric', month: 'short' });
 const dayLabel = (t) => {
@@ -21,8 +21,10 @@ const REPLIES = [
   'bookmarking the feeling'
 ];
 
-export function Chats({ openContactId, setOpenContactId, refreshContacts, connected, liveMsg, onlineIds, notify }) {
-  const [contacts, setContacts] = useState([]);
+export function Chats({
+  profile, contacts, openChat, setOpenChat, unread, setUnread,
+  liveMsg, setLiveMsg, backendOK, backend, event
+}) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [adding, setAdding] = useState(false);
@@ -31,56 +33,46 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
   const [err, setErr] = useState('');
   const [typingId, setTypingId] = useState(null);
   const bubbleBox = useRef(null);
-  const loadContacts = async () => {
-    if (connected) {
-      const rows = await backend.listUsers();
-      setContacts(rows.filter((r) => r.id !== myId()));
-    } else {
-      setContacts(await store.listContacts());
-    }
-  };
 
   const loadMsgs = async () => {
-    if (!openContactId) return setMessages([]);
-    setMessages(connected
-      ? await backend.listMessages(openContactId)
-      : await store.listMessages(openContactId));
+    if (!openChat) return setMessages([]);
+    if (backendOK && backend) {
+      const msgs = await backend.listMessages(openChat);
+      setMessages(msgs);
+    } else {
+      setMessages(await store.listMessages(openChat));
+    }
   };
 
   useEffect(() => {
     setTypingId(null);
-    (async () => {
-      await loadContacts();
-      await loadMsgs();
-    })();
-  }, [openContactId, connected]);
+    loadMsgs();
+  }, [openChat, backendOK]);
 
-  // incoming live messages: refresh the open conversation
   useEffect(() => {
     if (!liveMsg) return;
-    const has = connected
-      ? (liveMsg.msgs || []).some((m) => m.conv === backend.convKey(openContactId))
-      : liveMsg.contactId === openContactId;
+    const has = backendOK && backend
+      ? (liveMsg.msgs || []).some((m) => m.conv === backend.convKey(openChat))
+      : liveMsg.contactId === openChat;
     if (has) loadMsgs();
   }, [liveMsg]);
 
-  // keep the stack glued to the newest bubble
   useEffect(() => {
     const el = bubbleBox.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, typingId]);
 
-  const active = contacts.find((c) => c.id === openContactId);
+  const active = contacts.find((c) => c.id === openChat);
 
   const send = async () => {
     if (!draft.trim() || !active) return;
     const text = draft.trim();
     setDraft('');
-    if (connected) {
+    if (backendOK && backend) {
       await backend.sendMessage(active.id, text);
       await loadMsgs();
     } else {
-      setTypingId(active.id); // optimistic "typing…" hint, cleared when the reply lands
+      setTypingId(active.id);
       await store.addMessage({ id: uid(), contactId: active.id, from: 'me', text, created: Date.now() });
       await loadMsgs();
       setTimeout(async () => {
@@ -89,24 +81,23 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
           text: REPLIES[Math.floor(Math.random() * REPLIES.length)], created: Date.now()
         });
         setTypingId((cur) => (cur === active.id ? null : cur));
-        if (openContactId === active.id) loadMsgs();
+        if (openChat === active.id) loadMsgs();
       }, 1400);
     }
   };
 
   const find = async () => {
     setErr('');
-    if (connected) {
+    if (backendOK && backend) {
       const r = await backend.findUser(query.trim());
       setFound(r || null);
-      if (!r) notify(`No one is using ${query.trim()}`);
+      if (!r) event('search_miss', { query: query.trim() });
     } else {
       if (!query.trim()) return;
       await store.addContact({ id: uid(), name: query.trim(), symbol: '✦', added: Date.now() });
       setQuery('');
       setAdding(false);
-      await loadContacts();
-      if (refreshContacts) refreshContacts();
+      // contacts refreshed by parent
     }
   };
 
@@ -114,7 +105,7 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
     adding
       ? h('div', { class: 'card sheet' },
           h('h3', null, 'Find someone'),
-          h('p', { class: 'sub' }, connected ? 'search by glyph name' : 'offline preview — connect on the You tab to find real people'),
+          h('p', { class: 'sub' }, backendOK ? 'search by glyph name' : 'offline preview — connect on the You tab to find real people'),
           h('input', {
             class: 'field', placeholder: 'their glyph name e.g. nova✦', value: query,
             onInput: (e) => setQuery(e.currentTarget.value)
@@ -128,55 +119,55 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
                 ),
                 h('button', {
                   class: 'btn primary',
-                  onClick: () => { setOpenContactId(found.id); setAdding(false); }
+                  onClick: () => { setOpenChat(found.id); setAdding(false); }
                 }, 'Open chat')
               )
             : null,
-          err ? h('p', { class: 'empty' }, err) : null,
+          err ? h('p', { class: 'empty' }, err ) : null,
           h('div', { class: 'row' },
             h('button', { class: 'btn ghost', onClick: () => { setAdding(false); setErr(''); setFound(undefined); } }, 'Cancel'),
             h('button', {
               class: 'btn primary', disabled: !query.trim(),
               onClick: async () => {
                 await find();
-                if (!connected) setAdding(false);
+                if (!backendOK) setAdding(false);
               }
-            }, connected ? 'Search' : 'Add')
+            }, backendOK ? 'Search' : 'Add')
           )
         )
       : null,
-    !openContactId && !adding
+    !openChat && !adding
       ? h('button', { class: 'btn primary', onClick: () => setAdding(true) },
-          connected ? '+ Find someone' : '+ New chat')
+          backendOK ? '+ Find someone' : '+ New chat')
       : null,
-    !openContactId && !adding
+    !openChat && !adding
       ? (contacts.length === 0
-          ? h('p', { class: 'empty' }, connected
+          ? h('p', { class: 'empty' }, backendOK
               ? 'You are live. Find people by their glyph name.'
               : 'No conversations yet.')
           : contacts.map((c) =>
-              h('button', { class: 'contact card', key: c.id, onClick: () => setOpenContactId(c.id) },
+              h('button', { class: 'contact card', key: c.id, onClick: () => setOpenChat(c.id) },
                 h('span', { class: 'avatar mini' }, c.symbol),
                 h('b', null, c.name),
-                connected && onlineIds[c.id]
+                backendOK && onlineIds[c.id]
                   ? h('span', { class: 'dot online', title: 'online' }, '')
-                  : connected
+                  : backendOK
                     ? h('span', { class: 'dot', title: 'offline' }, '')
                     : null,
                 h('span', { class: 'chev' }, '›')
               ))
-         )
+        )
       : null,
     active
       ? h(h.Fragment, null,
           h('div', { class: 'chathead' },
-            h('button', { class: 'btn ghost', onClick: () => setOpenContactId(null) }, '‹'),
-      h('span', { class: 'avatar mini' }, active.symbol),
-      h('b', null, active.name),
-      h('span', {
-        class: (connected && onlineIds[active.id]) ? 'dot online big' : 'dot big'
-      })
-    ),
+            h('button', { class: 'btn ghost', onClick: () => setOpenChat(null) }, '‹'),
+            h('span', { class: 'avatar mini' }, active.symbol),
+            h('b', null, active.name),
+            h('span', {
+              class: (backendOK && onlineIds[active.id]) ? 'dot online big' : 'dot big'
+            })
+          ),
           h('div', { class: 'bubbles', ref: bubbleBox },
             (() => {
               let prevMsg = null;
@@ -200,7 +191,7 @@ export function Chats({ openContactId, setOpenContactId, refreshContacts, connec
               });
             })(),
             messages.length === 0 ? h('p', { class: 'empty' }, `say something to ${active.name}`) : null,
-            typingId === openContactId
+            typingId === openChat
               ? h('div', { class: 'bubble them typing', 'aria-label': 'typing' },
                   h('span', { class: 'tdot' }), h('span', { class: 'tdot' }), h('span', { class: 'tdot' }))
               : null

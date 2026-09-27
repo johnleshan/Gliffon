@@ -1,8 +1,8 @@
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
-import { KINDS } from './store.js';
+import { KINDS, uid } from './store.js';
 
-export function Composer({ onGlyph }) {
+export function Composer({ profile, onSave }) {
   const [kind, setKind] = useState(KINDS[0].kind);
   const [symbol, setSymbol] = useState(KINDS[0].symbols[0]);
   const [label, setLabel] = useState('');
@@ -13,6 +13,18 @@ export function Composer({ onGlyph }) {
   const pickKind = (k) => {
     setKind(k.kind);
     setSymbol(k.symbols[0]);
+  };
+
+  const cast = () => {
+    if (!label.trim()) return;
+    const g = {
+      id: uid(),
+      kind, symbol,
+      label: label.trim(),
+      note: note.trim() || undefined
+    };
+    onSave(g);
+    setLabel(''); setNote('');
   };
 
   return h('section', { class: `composer k-${kind}` },
@@ -58,14 +70,7 @@ export function Composer({ onGlyph }) {
       h('button', {
         class: 'btn primary cast',
         disabled: !label.trim(),
-        onClick: () => {
-          onGlyph({
-            kind, symbol,
-            label: label.trim(),
-            note: note.trim() || undefined
-          });
-          setLabel(''); setNote('');
-        }
+        onClick: cast
       }, 'Cast glyph ✦')
     )
   );

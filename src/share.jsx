@@ -3,8 +3,10 @@ import { useState } from 'preact/hooks';
 import { glyphCard } from './share.js';
 
 // In-app share sheet: send to a contact, cast to the wall, or native share fallback.
-export function ShareSheet({ glyph, contacts, onSendToContact, onCastToWall, onClose }) {
+export function ShareSheet({ glyph, contacts = [], onSendToContact, onCastToWall, onClose }) {
   const [copied, setCopied] = useState(false);
+
+  const shareUrl = location.origin + '/g/' + glyph.id;
 
   return h('div', { class: 'share-sheet', onClick: () => onClose() },
     h('div', { class: 'sheet glass', onClick: (e) => e.stopPropagation() },
@@ -25,16 +27,16 @@ export function ShareSheet({ glyph, contacts, onSendToContact, onCastToWall, onC
         h('button', {
           class: 'btn', onClick: async () => {
             try {
-              await navigator.clipboard.writeText(glyphCard(glyph));
+              await navigator.clipboard.writeText(shareUrl + '\n' + glyphCard(glyph));
               setCopied(true);
               setTimeout(() => setCopied(false), 1800);
             } catch {}
           }
-        }, copied ? 'Copied ✓' : 'Copy text'),
+        }, copied ? 'Copied ✓' : 'Copy link'),
         h('button', {
           class: 'btn ghost', onClick: async () => {
             if (navigator.share) {
-              try { await navigator.share({ title: 'Gliffon glyph', text: glyphCard(glyph) }); } catch {}
+              try { await navigator.share({ title: 'Gliffon glyph', text: glyphCard(glyph), url: shareUrl }); } catch {}
             }
             onClose();
           }
