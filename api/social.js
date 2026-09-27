@@ -3,6 +3,16 @@ import { sendToUser } from './_push.js';
 
 // One function for the whole social graph: follows, blocks, reports.
 // ?type=following|followers|blocks&action=follow|unfollow|block|unblock|report
+// Handles are stored with a leading "@"; accept the name with or without it.
+const findByHandle = (sql, handle) => {
+  const bare = String(handle || '').trim().replace(/^@+/, '').toLowerCase();
+  if (!bare) return Promise.resolve([]);
+  return sql`
+    select id from users
+    where lower(glyphname) = ${'@' + bare} or lower(ltrim(glyphname, '@')) = ${bare}
+    limit 1`;
+};
+
 export default bind(async (req, res) => {
   const sql = conn();
   const me = await authUser(sql, req);
@@ -48,7 +58,7 @@ export default bind(async (req, res) => {
     }
 
     if (!b.glyphname) return json(res, { error: 'glyphname required' }, 400);
-    const rows = await sql`select id from users where lower(glyphname) = ${String(b.glyphname).trim().toLowerCase()} limit 1`;
+    const rows = await findByHandle(sql, b.glyphname);
     if (!rows.length) return json(res, { error: 'no such glyph name' }, 404);
     const targetId = rows[0].id;
     if (targetId === me.id) return json(res, { error: "can't do that to yourself" }, 400);
@@ -74,7 +84,7 @@ export default bind(async (req, res) => {
     const b = await readBody(req);
     if (action === 'report') return json(res, { error: 'not supported' }, 400);
     if (!b.glyphname) return json(res, { error: 'glyphname required' }, 400);
-    const rows = await sql`select id from users where lower(glyphname) = ${String(b.glyphname).trim().toLowerCase()} limit 1`;
+    const rows = await findByHandle(sql, b.glyphname);
     if (!rows.length) return json(res, { error: 'no such glyph name' }, 404);
     const targetId = rows[0].id;
     if (action === 'unfollow') {

@@ -41,7 +41,11 @@ export default bind(async (req, res) => {
 
     // Never mutate an existing account here. Updating on conflict would let any
     // stranger rename someone else's identity; keys are only ever set at signup.
-    const existing = await sql`select id, glyphname from users where lower(glyphname) = ${bare} limit 1`;
+    // Handles are stored with a leading "@", so compare on the stripped form.
+    const existing = await sql`
+      select id from users
+      where lower(glyphname) = ${'@' + bare} or lower(ltrim(glyphname, '@')) = ${bare}
+      limit 1`;
     if (existing.length) {
       return json(res, { error: 'that glyph name is taken' }, 409);
     }
