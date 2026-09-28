@@ -88,6 +88,9 @@ export function App() {
   const [commentsOpen, setCommentsOpen] = useState(null);
   const [comments, setComments] = useState({});
   const [feedFilter, setFeedFilter] = useState('all'); // 'all' | 'following'
+  const [theme, setTheme] = useState(() => (
+    localStorage.getItem('gliffon.theme') === 'midnight' ? 'midnight' : 'ember'
+  ));
   const openRef = useRef(null);
   openRef.current = openChat;
   const prevLikes = useRef({});
@@ -429,8 +432,17 @@ export function App() {
           }, t.charAt(0).toUpperCase() + t.slice(1))
         )
       ),
-      h('div', { class: 'header-actions' },
-        h('button', { class: 'iconbtn', onClick: () => setFeedFilter((f) => f === 'all' ? 'following' : 'all') },
+    h('div', { class: 'header-actions' },
+      h('button', { class: 'iconbtn', title: 'Brand theme ⇄', onClick: async () => {
+        const next = theme === 'midnight' ? 'ember' : 'midnight';
+        setTheme(next);
+        localStorage.setItem('gliffon.theme', next);
+        document.documentElement.dataset.theme = next === 'midnight' ? 'midnight' : '';
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', next === 'midnight' ? '#0a0f22' : '#0e0a0f');
+        try { await event('theme', { value: next }); } catch {}
+      } }, theme === 'midnight' ? '☾' : '✦'),
+      h('button', { class: 'iconbtn', onClick: () => setFeedFilter((f) => f === 'all' ? 'following' : 'all') },
           feedFilter === 'following' ? '⧉ Following' : '⬤ All'
         ),
         h('button', { class: 'iconbtn', onClick: () => setTab('composer') }, '✦'),
@@ -482,6 +494,18 @@ export function App() {
           h('div', { class: 'stat' }, h('span', null, glyphs.length), h('small', null, 'casts')),
           h('div', { class: 'stat' }, h('span', null, following.size), h('small', null, 'following')),
           h('div', { class: 'stat' }, h('span', null, contacts.length), h('small', null, 'contacts'))
+        )
+      ),
+      h('div', { class: 'card manifestocard' },
+        h('h3', { class: 'cardtitle' }, 'Gliffon is where symbols breathe'),
+        h('p', { class: 'manifesto' },
+          'Gliffon is not just an app — it is a living canvas of connection. In a world of fleeting posts and endless scrolls, we restore meaning: here, emotions are carved into symbols, shared as living glyphs.'),
+        h('p', { class: 'manifesto' },
+          'Every mood, every memory, every bond becomes a spark — intimate, timeless, unforgettable.'),
+        h('div', { class: 'slogans' },
+          h('span', null, '"Symbols of us, shared forever."'),
+          h('span', null, '"More than words — it\'s a vibe."'),
+          h('span', null, '"Say it in symbols."')
         )
       ),
       h('details', { class: 'settings' },
