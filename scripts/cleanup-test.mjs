@@ -13,7 +13,11 @@ const url = env
   .replace(/^"|"$/g, '');
 const sql = neon(url);
 
-const rows = await sql`select id, glyphname from users where glyphname like '@e2e%' or glyphname like '@claim%' or glyphname like '@wallcheck%'`;
+const rows = await sql`
+  select id, glyphname from users
+  where glyphname like '@e2e%' or glyphname like '@claim%'
+     or glyphname like '@wallcheck%' or glyphname like '@chattest%'
+     or glyphname like '@menutest%' or glyphname like '@glow%' or glyphname like '@iconcheck%'`;
 if (!rows.length) {
   console.log('no test users to clean');
   process.exit(0);

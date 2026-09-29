@@ -123,20 +123,20 @@ export function Reels({
           ),
           h('button', {
             class: 'act more', 'aria-label': 'more options',
-            onClick: () => setMenu(menuFor === g.id ? null : g.id)
+            onClick: () => setMenuFor(menuFor === g.id ? null : g.id)
           }, h('span', null, '⋯')),
           h('small', { class: 'kindlabel' },
             (KINDS.find((k) => k.kind === g.kind) || {}).name || 'Glyph'
           ),
           menuFor === g.id && h('div', { class: 'reelmenu glass' },
-            h('button', { class: 'mi', onClick: () => { navigator.clipboard?.writeText(location.origin + '/g/' + g.id); setMenu(null); event('copy_link', { glyphId: g.id }); } },
+            h('button', { class: 'mi', onClick: () => { navigator.clipboard?.writeText(location.origin + '/g/' + g.id); setMenuFor(null); event('copy_link', { glyphId: g.id }); } },
               'Copy link'),
-            h('button', { class: 'mi', onClick: () => { reportGlyph(g, 'misleading or spam'); setMenu(null); } },
+            h('button', { class: 'mi', onClick: () => { reportGlyph(g, 'misleading or spam'); setMenuFor(null); } },
               'Report glyph'),
             g.who && !isMe && h('button', {
-              class: 'mi danger', onClick: () => { blockUser({ id: g.who.rid, glyphname: (g.who.glyphname || '').replace('@', '') }); setMenu(null); }
+              class: 'mi danger', onClick: () => { blockUser({ id: g.who.rid, glyphname: (g.who.glyphname || '').replace('@', '') }); setMenuFor(null); }
             }, 'Block ' + (g.who.glyphname || g.who.name)),
-            g.who && !isMe && h('button', { class: 'mi', onClick: () => { reportUser({ id: g.who.rid }, 'harassment or spam'); setMenu(null); } },
+            g.who && !isMe && h('button', { class: 'mi', onClick: () => { reportUser({ id: g.who.rid }, 'harassment or spam'); setMenuFor(null); } },
               'Report ' + (g.who.glyphname || g.who.name))
           )
         )

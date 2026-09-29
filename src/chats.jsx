@@ -1,4 +1,4 @@
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { store, uid } from './store.js';
 import { backend, getMyId, at } from './backend.js';
@@ -173,7 +173,7 @@ export function Chats({
         )
       : null,
     active
-      ? h(h.Fragment, null,
+      ? h(Fragment, null,
           h('div', { class: 'chathead' },
             h('button', { class: 'btn ghost', onClick: () => setOpenChat(null) }, '‹'),
             h('span', { class: 'avatar mini' }, active.symbol),
