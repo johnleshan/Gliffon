@@ -1655,3 +1655,52 @@ nav button.active .navicon {
 
 /* svg icon buttons obey theme */
 .iconbtn svg { display: block; }
+/* ---------- password auth ---------- */
+.authform { display: flex; flex-direction: column; width: 100%; gap: 10px; }
+.pwrow { gap: 8px; }
+.pwrow .pweye {
+  flex: none; background: none; border: 0; cursor: pointer;
+  font: 600 12px var(--font-body);
+  color: var(--muted);
+  padding: 0 2px;
+}
+.pwrow .pweye:hover { color: var(--gold); }
+.pwstrength { display: flex; align-items: center; gap: 9px; margin: -2px 0 2px; }
+.pwbar {
+  flex: 1; height: 4px; border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.pwfill {
+  display: block; height: 100%;
+  border-radius: 999px;
+  transition: width 0.25s var(--ease-out), background 0.25s ease;
+  background: var(--rose);
+}
+.pwfill.lvl1 { background: var(--accent); }
+.pwfill.lvl2 { background: var(--gold); }
+.pwfill.lvl3 { background: var(--gold); }
+.pwfill.lvl4 { background: var(--good); }
+.pwstrength .sub { flex: none; font-size: 11.5px; }
+
+/* ---------- your devices ---------- */
+.keyrow.col { flex-direction: column; align-items: stretch; gap: 10px; }
+.devicelist { display: flex; flex-direction: column; gap: 6px; }
+.devicerow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+.devicerow.on { border-color: rgb(var(--gold-rgb) / 0.4); background: var(--card-hi); }
+.devdot {
+  flex: none; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--faint);
+}
+.devicerow.on .devdot { background: var(--good); box-shadow: 0 0 8px var(--good); }
+.devinfo { display: flex; flex-direction: column; gap: 1px; text-align: left; min-width: 0; flex: 1; }
+.devinfo b { font-size: 13.5px; }
+.devinfo .sub { font-size: 11.5px; }
+.devform { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.devform .row { display: flex; gap: 8px; justify-content: flex-end; }

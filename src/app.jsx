@@ -55,6 +55,74 @@ function PublicGlyph({ glyphId }) {
   );
 }
 
+// Signed-in devices. Every device holds its own session, so this account can
+// be open on a phone and a laptop at once — and you can kick any of them out.
+function YourDevices() {
+  const [devices, setDevices] = useState(null);
+  const [changing, setChanging] = useState(false);
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const load = async () => {
+    try { setDevices(await backend.devices()); } catch { setDevices([]); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const rel = (t) => {
+    const s = Math.max(1, Math.round((Date.now() - new Date(t).getTime()) / 60000));
+    if (s < 60) return s + 'm ago';
+    if (s < 1440) return Math.round(s / 60) + 'h ago';
+    return Math.round(s / 1440) + 'd ago';
+  };
+
+  return h('div', { class: 'keyrow col' },
+    h('div', { class: 'keyinfo' },
+      h('b', null, 'Your devices'),
+      h('span', { class: 'sub' }, 'signed in everywhere you use Gliffon')
+    ),
+    h('div', { class: 'devicelist' },
+      (devices || []).map((d) =>
+        h('div', { class: 'devicerow' + (d.is_current ? ' on' : ''), key: d.id },
+          h('span', { class: 'devdot' }),
+          h('div', { class: 'devinfo' },
+            h('b', null, d.label || 'device'),
+            h('span', { class: 'sub' }, d.is_current ? 'this device · ' : '' + rel(d.last_seen))
+          ),
+          !d.is_current && h('button', {
+            class: 'btn ghost tiny',
+            onClick: async () => {
+              try { await backend.revokeDevice(d.id); await load(); }
+              catch (e) { setMsg(e.message); }
+            }
+          }, 'Sign out')
+        )
+      ),
+      devices && devices.length === 0 ? h('p', { class: 'sub' }, 'no other devices') : null
+    ),
+    changing
+      ? h('form', { class: 'devform', onSubmit: async (e) => {
+          e.preventDefault();
+          setMsg('');
+          try {
+            await backend.setPassword(current, next);
+            setMsg('Password updated ✓');
+            setChanging(false);
+            setCurrent(''); setNext('');
+          } catch (err) { setMsg(err.message); }
+        } },
+          h('input', { class: 'field', type: 'password', placeholder: 'current password', value: current, onInput: (e) => setCurrent(e.currentTarget.value) }),
+          h('input', { class: 'field', type: 'password', placeholder: 'new password (8+ chars)', value: next, onInput: (e) => setNext(e.currentTarget.value) }),
+          h('div', { class: 'row' },
+            h('button', { class: 'btn ghost', type: 'button', onClick: () => setChanging(false) }, 'Cancel'),
+            h('button', { class: 'btn primary', type: 'submit', disabled: next.length < 8 }, 'Save')
+          )
+        )
+      : h('button', { class: 'btn ghost tiny', onClick: () => setChanging(true) }, 'Change password'),
+    msg ? h('p', { class: 'beta' }, msg) : null
+  );
+}
+
 function setMeta(property, content) {
   let el = document.head.querySelector(`meta[property="${property}"]`);
   if (!el) {
@@ -381,45 +449,45 @@ export function App() {
   if (!profile) {
     return h(Auth, {
       connected: backendOK,
-      onSignUp: async (p, key) => {
-        let saved = p;
-        if (backendOK && backend) saved = await backend.signup(p, key);
+      onSignUp: async ({ username, password, symbol }) => {
+        let saved = { username, symbol };
+        if (backendOK && backend) saved = await backend.signup({ username, password, symbol });
         const merged = {
-          name: saved.name || p.name,
-          glyphName: saved.glyphname || p.glyphName,
-          symbol: saved.symbol || p.symbol,
+          name: saved.name,
+          glyphName: saved.glyphname || '@' + username,
+          symbol: saved.symbol || symbol,
           joined: new Date().getTime()
         };
         await store.saveProfile(merged);
         setProfile(merged);
-        notify('Welcome to Gliffon ✦ — your key is saved on this device');
+        notify('Welcome to Gliffon ✦');
         event('signup', { symbol: merged.symbol });
         refresh();
       },
-      onSignIn: async (handle, key) => {
+      onSignIn: async (username, password) => {
         if (backendOK && backend) {
-          const u = await backend.signIn(handle, key);
-          if (!u) throw new Error('wrong glyph name or account key — create an account');
-          await store.saveProfile({
+          const u = await backend.signIn(username, password);
+          if (!u) throw new Error('wrong username or password');
+          const p = {
             name: u.name,
             glyphName: u.glyphname,
             symbol: u.symbol,
             joined: new Date().getTime()
-          });
-          setProfile({
-            name: u.name,
-            glyphName: u.glyphname,
-            symbol: u.symbol,
-            joined: new Date().getTime()
-          });
+          };
+          await store.saveProfile(p);
+          setProfile(p);
           notify(`Signed in as ${u.glyphname} ✦`);
           refresh();
         } else {
-          const p = { name: handle, glyphName: handle, symbol: '✦', joined: Date.now() };
+          const p = { name: username, glyphName: '@' + username, symbol: '✦', joined: Date.now() };
           await store.saveProfile(p);
           setProfile(p);
           notify('Pinned locally ✓ (connect for the global Wall)');
         }
+      },
+      onSetPassword: async (current, password) => {
+        if (backendOK && backend) await backend.setPassword(current, password);
+        notify('Password set ✓ you can sign in on any device now');
       }
     });
   }
@@ -516,17 +584,7 @@ export function App() {
       ),
       h('details', { class: 'settings' },
         h('summary', null, 'Settings'),
-        backendOK && getAuth().token && h('div', { class: 'keyrow' },
-          h('div', { class: 'keyinfo' },
-            h('b', null, 'Account key'),
-            h('span', { class: 'sub' }, 'saves you when switching devices — keep it private')
-          ),
-          h('button', { class: 'btn ghost tiny', onClick: async () => {
-            const tok = getAuth().token;
-            try { await navigator.clipboard.writeText(tok); notify('Key copied to clipboard ✓'); }
-            catch { notify('Key: ' + tok.slice(0, 4) + '…' + tok.slice(-4)); }
-          } }, 'Copy key')
-        ),
+        backendOK && h(YourDevices),
         h('label', null, 'Reminders', h('select', {
           value: remindState, onChange: (e) => { remind.set(e.target.value); setRemindState(e.target.value); }
         }, ['off', 'gentle', 'daily'].map((v) => h('option', { value: v }, v)))),

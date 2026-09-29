@@ -1,9 +1,12 @@
 // REST adapter for the Vercel + Neon deploy. Polling replaces websockets.
-// Auth now uses account keys (magic strings). Token stored in localStorage.
+// Auth is username + password. The password is the identity; each device
+// stores only its own session token, so signing in elsewhere does not
+// invalidate the devices you already have.
 
 const CONFIG_KEY = 'gliffon.backend';
 const TOKEN_KEY = 'gliffon.token';
 const UID_KEY = 'gliffon.uid';
+const SESSION_KEY = 'gliffon.session';
 
 export const getBackendConfig = () => {
   try {
@@ -29,9 +32,16 @@ export const getToken = () => {
 };
 
 export const saveToken = (t) => localStorage.setItem(TOKEN_KEY, t);
+export const saveSessionId = (s) => {
+  try { if (s) localStorage.setItem(SESSION_KEY, s); else localStorage.removeItem(SESSION_KEY); } catch {}
+};
+export const getSessionId = () => {
+  try { return localStorage.getItem(SESSION_KEY); } catch { return null; }
+};
 export const clearToken = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(UID_KEY);
+  localStorage.removeItem(SESSION_KEY);
 };
 
 // The authenticated user id, persisted so a page reload keeps working
@@ -89,49 +99,91 @@ export const backendReachable = async () => {
   }
 };
 
+// A human-friendly device name so "your devices" is understandable later.
+function deviceLabel() {
+  try {
+    const ua = navigator.userAgent;
+    if (/iPhone/i.test(ua)) return 'iPhone';
+    if (/iPad/i.test(ua)) return 'iPad';
+    if (/Android/i.test(ua)) return /Mobile/i.test(ua) ? 'Android phone' : 'Android tablet';
+    if (/Macintosh/i.test(ua)) return 'Mac';
+    if (/Windows/i.test(ua)) return 'Windows PC';
+    if (/Linux/i.test(ua)) return 'Linux';
+  } catch { /* ignore */ }
+  return 'this device';
+}
+
 export const backend = cfg
   ? {
       online: true,
-      // key-based signin
-      async signIn(glyphname, key) {
-        const { ok, user } = await j('/api/session', {
+
+      // Sign in with username + password. The server issues a session token
+      // for THIS device; other devices keep their own.
+      async signIn(username, password) {
+        const d = await j('/api/auth?action=login', {
           method: 'POST',
-          body: JSON.stringify({ glyphname, key })
+          body: JSON.stringify({ username, password, label: deviceLabel() })
         });
-        if (ok && user) {
-          saveToken(key);
-          setMyUserId(user.id);
-          return user;
+        if (d.ok && d.token && d.user) {
+          saveToken(d.token);
+          saveSessionId(d.session_id);
+          setMyUserId(d.user.id);
+          return d.user;
         }
         return null;
       },
-      // signup: the account key is generated once and never sent to the server
-      // in the clear (only its sha256 hash is stored).
-      async signup(profile, key) {
-        const { ok, user } = await j('/api/users', {
+
+      // Create an account. The password never touches storage on this device —
+      // it goes straight to the server, which stores only a salted scrypt hash.
+      async signup({ username, password, name, symbol }) {
+        const d = await j('/api/auth?action=signup', {
           method: 'POST',
-          body: JSON.stringify({ ...profile, key })
+          body: JSON.stringify({ username, password, name, symbol, label: deviceLabel() })
         });
-        if (ok && user) {
-          saveToken(key);
-          setMyUserId(user.id);
-          return user;
+        if (d.ok && d.token && d.user) {
+          saveToken(d.token);
+          saveSessionId(d.session_id);
+          setMyUserId(d.user.id);
+          return d.user;
         }
-        throw new Error('signup failed');
+        throw new Error(d.error || 'signup failed');
       },
-      // exchange the stored key for the current user profile
+
+      // Resolve the signed-in user from this device's session token.
       async sessionUser() {
         const tok = getToken();
         if (!tok) return null;
         try {
-          const { ok, user } = await j('/api/session', {
-            method: 'POST',
-            body: JSON.stringify({ key: tok })
-          });
-          if (ok && user) { setMyUserId(user.id); return user; }
+          const d = await j('/api/auth?action=me');
+          if (d.ok && d.user) { setMyUserId(d.user.id); return d.user; }
           return null;
         } catch { return null; }
       },
+
+      // Set a password (first time) or change it (needs the current one).
+      async setPassword(current, password) {
+        return await j('/api/auth?action=password', {
+          method: 'POST',
+          body: JSON.stringify({ current, password })
+        });
+      },
+
+      async devices() {
+        return await j('/api/auth?action=devices');
+      },
+
+      async revokeDevice(sessionId) {
+        return await j('/api/auth?action=revoke', {
+          method: 'POST',
+          body: JSON.stringify({ session_id: sessionId })
+        });
+      },
+
+      async hasPassword() {
+        const u = await j('/api/auth?action=me');
+        return { id: u.user.id, has_password: true };
+      },
+
       async listUsers() {
         const rows = await j('/api/users');
         return rows.map((r) => ({ ...r, glyphname: r.glyphname }));
@@ -229,7 +281,9 @@ export const backend = cfg
       async pushTest(title, body) {
         await j('/api/push?action=test', { method: 'POST', body: JSON.stringify({ title, body }) });
       },
-      signOut() {
+      // Signs out THIS device only. Other devices stay signed in.
+      async signOut() {
+        try { await j('/api/auth?action=logout', { method: 'POST', body: '{}' }); } catch {}
         clearToken();
       }
     }

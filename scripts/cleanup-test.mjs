@@ -17,7 +17,14 @@ const rows = await sql`
   select id, glyphname from users
   where glyphname like '@e2e%' or glyphname like '@claim%'
      or glyphname like '@wallcheck%' or glyphname like '@chattest%'
-     or glyphname like '@menutest%' or glyphname like '@glow%' or glyphname like '@iconcheck%'`;
+     or glyphname like '@menutest%' or glyphname like '@glow%'
+     or glyphname like '@iconcheck%' or glyphname like '@prodchat%'
+     or glyphname like '@persist%' or glyphname like '@multi%'
+     or glyphname like '@luna%' or glyphname like '@arcus%'
+     or glyphname like '@echo%' or glyphname like '@iris%'
+     or glyphname like '@fable%' or glyphname like '@ember%'
+     or glyphname like '@vibe%' or glyphname like '@serin%'
+     or glyphname like '@nova%' or glyphname like '@glow1%'`;
 if (!rows.length) {
   console.log('no test users to clean');
   process.exit(0);
@@ -34,6 +41,7 @@ for (const u of rows) {
   await sql`delete from blocks where blocker = ${u.id} or blocked = ${u.id}`;
   await sql`delete from push_subs where user_id = ${u.id}`;
   await sql`delete from wall where author = ${u.id}`;
+  await sql`delete from sessions where user_id = ${u.id}`;
   await sql`delete from users where id = ${u.id}`;
   console.log('removed', u.glyphname);
 }

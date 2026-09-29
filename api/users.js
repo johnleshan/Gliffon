@@ -1,14 +1,15 @@
-import { conn, bind, json, readBody, hashToken, authUser, rate } from './_db.js';
+import { conn, bind, json, readBody, authUser, rate } from './_db.js';
 
-const publicUser = (u) => ({
-  id: u.id, glyphname: u.glyphname, name: u.name, symbol: u.symbol
-});
-
+// The public glyph directory plus presence. Account creation lives in
+// api/auth.js (username + password).
 export default bind(async (req, res) => {
   const sql = conn();
 
   if (req.method === 'GET') {
-    const rows = await sql`select id, glyphname, name, symbol, extract(epoch from now() - seen)::int as seen_ago from users order by created asc limit 500`;
+    const rows = await sql`
+      select id, glyphname, name, symbol,
+             extract(epoch from now() - seen)::int as seen_ago
+      from users order by created asc limit 500`;
     return json(res, rows);
   }
 
@@ -24,38 +25,7 @@ export default bind(async (req, res) => {
       return json(res, { ok: true });
     }
 
-    if (!rate(req, res, { key: 'signup', max: 10, windowMs: 60000 })) return;
-    if (!u.key) return json(res, { error: 'account key required' }, 400);
-
-    // Accept both glyphname and glyphName so client naming can't drift.
-    const handle = String(u.glyphname || u.glyphName || '').trim().replace(/^@/, '');
-    const bare = handle.toLowerCase();
-    if (!bare || bare.length > 30) return json(res, { error: 'glyph name required' }, 400);
-
-    // Normalise identity: a display name is never allowed to be blank or handle-shaped,
-    // otherwise every interaction would degrade to "anon"/"someone".
-    let name = String(u.name || '').trim().replace(/^@/, '');
-    if (!name || name.toLowerCase() === bare) {
-      name = bare.replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    }
-
-    // Never mutate an existing account here. Updating on conflict would let any
-    // stranger rename someone else's identity; keys are only ever set at signup.
-    // Handles are stored with a leading "@", so compare on the stripped form.
-    const existing = await sql`
-      select id from users
-      where lower(glyphname) = ${'@' + bare} or lower(ltrim(glyphname, '@')) = ${bare}
-      limit 1`;
-    if (existing.length) {
-      return json(res, { error: 'that glyph name is taken' }, 409);
-    }
-
-    const id = u.id || 'u' + hashToken(handle + u.key).slice(0, 20);
-    await sql`
-      insert into users (id, glyphname, name, symbol, token_hash)
-      values (${id}, ${'@' + bare}, ${name}, ${u.symbol || '✦'}, ${hashToken(u.key)})`;
-
-    return json(res, { ok: true, user: { id, glyphname: '@' + bare, name, symbol: u.symbol || '✦' } });
+    return json(res, { error: 'create an account with POST /api/auth?action=signup' }, 400);
   }
 
   return json(res, { error: 'method' }, 405);
