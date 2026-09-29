@@ -11,13 +11,12 @@ window.addEventListener('error', (e) => {
   setTimeout(() => box.remove(), 8000);
 });
 
-// Apply the saved brand theme before first paint (no flash of wrong look).
+// Brand is Midnight-only now (the old Ember skin is retired).
+// Apply it before first paint so there is never a flash of the wrong look.
 try {
-  if (localStorage.getItem('gliffon.theme') === 'midnight') {
-    document.documentElement.dataset.theme = 'midnight';
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', '#0a0f22');
-  }
+  document.documentElement.dataset.theme = 'midnight';
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', '#0a0f22');
 } catch {}
 
 render(h(App), document.getElementById('app'));

@@ -8,6 +8,7 @@ const UID_KEY = 'gliffon.uid';
 export const getBackendConfig = () => {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
+    if (raw === 'offline') return { offline: true };
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -15,7 +16,8 @@ export const getBackendConfig = () => {
 };
 
 export const saveBackendConfig = (base) => {
-  localStorage.setItem(CONFIG_KEY, JSON.stringify({ url: base.trim().replace(/\/+$/, '') }));
+  if (!base || !base.trim()) localStorage.setItem(CONFIG_KEY, 'offline');
+  else localStorage.setItem(CONFIG_KEY, JSON.stringify({ url: base.trim().replace(/\/+$/, '') }));
 };
 
 export const clearBackendConfig = () => localStorage.removeItem(CONFIG_KEY);
@@ -45,9 +47,15 @@ const setMyUserId = (id) => {
   } catch { /* storage unavailable */ }
 };
 
+// The live backend. On localhost we default to the deployed API so local dev
+// shows the real community instead of an empty offline sandbox.
+const PROD_API = 'https://gliffon.vercel.app';
+
 let cfg = getBackendConfig();
 const isLocal = /(localhost|127\.0\.0\.1)/.test(location.hostname);
-if (!cfg && !isLocal) cfg = { url: '' };
+if (!cfg || cfg.offline) {
+  cfg = cfg && cfg.offline ? null : (isLocal ? { url: PROD_API } : { url: '' });
+}
 
 function api(path) {
   return cfg.url.startsWith('http') ? cfg.url + path : location.origin + path;
@@ -60,10 +68,26 @@ async function j(path, opts = {}) {
   if (opts.headers) Object.assign(headers, opts.headers);
 
   const r = await fetch(api(path), { ...opts, headers });
-  const d = await r.json().catch(() => ({}));
+  const d = await r.json().catch(() => {
+    // A non-JSON response means we hit the SPA shell instead of an API route
+    // (e.g. pointing at a preview without serverless functions). Surface that
+    // clearly rather than failing with a cryptic "Unexpected token <".
+    throw new Error('That address is not a Gliffon API (it served the web page)');
+  });
   if (!r.ok || d.error) throw new Error(d.error || r.status);
   return d;
 }
+
+// Probe once at boot: if the configured backend cannot serve the API, fall
+// back to offline mode instead of leaving the app half-working.
+export const backendReachable = async () => {
+  try {
+    const r = await fetch(api('/api/users'));
+    return r.ok && (r.headers.get('content-type') || '').includes('json');
+  } catch {
+    return false;
+  }
+};
 
 export const backend = cfg
   ? {

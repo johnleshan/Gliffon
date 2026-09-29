@@ -45,7 +45,9 @@ export function Reels({
   return h('div', { class: 'reels', ref: box, onScroll },
     h('div', { class: 'reelcount', 'aria-hidden': 'true' },
       h('span', { class: 'reelcount-now' }, String(active + 1).padStart(2, '0')),
-      h('span', { class: 'reelcount-line' }),
+      h('span', { class: 'reelcount-progress' },
+        h('i', { class: 'reelcount-fill', style: `transform:scaleX(${String((active + 1) / Math.max(1, glyphs.length)).slice(0, 5)})` })
+      ),
       h('span', { class: 'reelcount-total' }, String(glyphs.length).padStart(2, '0'))
     ),
     glyphs.map((g, i) => {
@@ -115,9 +117,9 @@ export function Reels({
             class: 'act' + (isFollowing ? ' following' : ''),
             'aria-label': isFollowing ? 'unfollow' : 'follow',
             onClick: () => toggleFollow(g.who)
-          }, isFollowing ? '✓' : '➕'),
+          }, isFollowing ? '✓' : '+'),
           h('button', { class: 'act share', 'aria-label': 'share glyph', onClick: () => onShare(g) },
-            h('span', null, '⤴')
+            h('span', null, '↗')
           ),
           h('button', {
             class: 'act more', 'aria-label': 'more options',

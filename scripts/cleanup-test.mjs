@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { readFileSync } from 'node:fs';
 
-// Removes throwaway e2e accounts and everything they touched.
+// Removes throwaway claim/e2e accounts and everything they touched.
 const env = readFileSync('.env.production', 'utf8');
 const url = env
   .split('\n')
@@ -13,9 +13,9 @@ const url = env
   .replace(/^"|"$/g, '');
 const sql = neon(url);
 
-const rows = await sql`select id, glyphname from users where glyphname like '@e2e%'`;
+const rows = await sql`select id, glyphname from users where glyphname like '@e2e%' or glyphname like '@claim%' or glyphname like '@wallcheck%'`;
 if (!rows.length) {
-  console.log('no e2e users to clean');
+  console.log('no test users to clean');
   process.exit(0);
 }
 
@@ -34,5 +34,5 @@ for (const u of rows) {
   console.log('removed', u.glyphname);
 }
 
-const left = await sql`select count(*)::int as n from users where glyphname like '@e2e%'`;
-console.log('remaining e2e users:', left[0].n);
+const left = await sql`select glyphname from users order by created asc`;
+console.log('remaining users:', left.map((u) => u.glyphname).join(', '));

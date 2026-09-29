@@ -8,7 +8,7 @@ import { Pulse } from './pulse.jsx';
 import { Reels } from './reels.jsx';
 import { Chats } from './chats.jsx';
 import { ShareSheet } from './share.jsx';
-import { backend, getBackendConfig, getAuth, setMyId, getMyId, at } from './backend.js';
+import { backend, getBackendConfig, getAuth, setMyId, getMyId, at, backendReachable } from './backend.js';
 
 const convOpen = (conv, openId) => openId && conv.split('|').includes(openId);
 
@@ -75,9 +75,7 @@ export function App() {
   const [openChat, setOpenChat] = useState(null);
   const [shareTarget, setShareTarget] = useState(null);
   const [contacts, setContacts] = useState([]);
-  const [backendOK, setBackendOK] = useState(
-    () => !!getBackendConfig() || !/(localhost|127\.0\.0\.1)/.test(location.hostname)
-  );
+  const [backendOK, setBackendOK] = useState(() => getBackendConfig() !== 'offline');
   const [liveMsg, setLiveMsg] = useState(null);
   const [unread, setUnread] = useState(0);
   const [onlineIds, setOnlineIds] = useState({});
@@ -88,9 +86,6 @@ export function App() {
   const [commentsOpen, setCommentsOpen] = useState(null);
   const [comments, setComments] = useState({});
   const [feedFilter, setFeedFilter] = useState('all'); // 'all' | 'following'
-  const [theme, setTheme] = useState(() => (
-    localStorage.getItem('gliffon.theme') === 'midnight' ? 'midnight' : 'ember'
-  ));
   const openRef = useRef(null);
   openRef.current = openChat;
   const prevLikes = useRef({});
@@ -144,6 +139,13 @@ export function App() {
 
   useEffect(() => {
     (async () => {
+      // Verify the backend actually speaks the API before trusting it, so a
+      // misconfigured URL drops us to a clean offline state instead of a
+      // half-broken social experience.
+      if (backendOK && backend && !(await backendReachable())) {
+        setBackendOK(false);
+      }
+
       // If a token exists, resolve the real user id for conv keys and ownership
       if (backendOK && backend) {
         const { token } = getAuth();
@@ -180,7 +182,7 @@ export function App() {
 
   async function subscribePush(reg) {
     try {
-      const vapidPublic = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9vvmcNWPA6kf4mr6VkGrsKDESu1Krs/hrbpR5ES9MyBhnQss4kGrJJhV/QbQS67AAkRu/swfZDBksJEuCZwUrw==';
+      const vapidPublic = 'BB8CxhxMF4ulvXx0CSm3YovhzGCc8fVqAY5fiK_Dr7gdSfNPh_MAGpqKKAEPVZ3WHrC7tG7YUmAY7pg4tYnKQJw';
       const key = urlBase64ToUint8Array(vapidPublic);
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -380,10 +382,18 @@ export function App() {
     return h(Auth, {
       connected: backendOK,
       onSignUp: async (p, key) => {
-        if (backendOK && backend) await backend.signup(p, key);
-        await store.saveProfile(p);
-        setProfile(p);
-        notify('Welcome to Gliffon ✦');
+        let saved = p;
+        if (backendOK && backend) saved = await backend.signup(p, key);
+        const merged = {
+          name: saved.name || p.name,
+          glyphName: saved.glyphname || p.glyphName,
+          symbol: saved.symbol || p.symbol,
+          joined: new Date().getTime()
+        };
+        await store.saveProfile(merged);
+        setProfile(merged);
+        notify('Welcome to Gliffon ✦ — your key is saved on this device');
+        event('signup', { symbol: merged.symbol });
         refresh();
       },
       onSignIn: async (handle, key) => {
@@ -433,20 +443,16 @@ export function App() {
         )
       ),
     h('div', { class: 'header-actions' },
-      h('button', { class: 'iconbtn', title: 'Brand theme ⇄', onClick: async () => {
-        const next = theme === 'midnight' ? 'ember' : 'midnight';
-        setTheme(next);
-        localStorage.setItem('gliffon.theme', next);
-        document.documentElement.dataset.theme = next === 'midnight' ? 'midnight' : '';
-        const meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute('content', next === 'midnight' ? '#0a0f22' : '#0e0a0f');
-        try { await event('theme', { value: next }); } catch {}
-      } }, theme === 'midnight' ? '☾' : '✦'),
-      h('button', { class: 'iconbtn', onClick: () => setFeedFilter((f) => f === 'all' ? 'following' : 'all') },
-          feedFilter === 'following' ? '⧉ Following' : '⬤ All'
-        ),
-        h('button', { class: 'iconbtn', onClick: () => setTab('composer') }, '✦'),
-        h('button', { class: 'iconbtn', onClick: signOut }, '⏻')
+      h('button', { class: 'iconbtn', title: 'Feed filter', onClick: () => setFeedFilter((f) => f === 'all' ? 'following' : 'all') },
+        feedFilter === 'following' ? 'Following' : 'All'
+      ),
+      h('button', { class: 'iconbtn', title: 'Cast a glyph', onClick: () => setTab('composer') }, '✦'),
+      h('button', { class: 'iconbtn', title: 'Sign out', onClick: signOut, 'aria-label': 'Sign out' },
+        h('svg', { viewBox: '0 0 24 24', width: 20, height: 20, 'aria-hidden': 'true', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round' },
+          h('path', { d: 'M12 3v8' }),
+          h('path', { d: 'M6.7 6.2a8 8 0 1 0 10.6 0' })
+        )
+      )
       )
     ),
 
@@ -510,7 +516,18 @@ export function App() {
       ),
       h('details', { class: 'settings' },
         h('summary', null, 'Settings'),
-h('label', null, 'Reminders', h('select', {
+        backendOK && getAuth().token && h('div', { class: 'keyrow' },
+          h('div', { class: 'keyinfo' },
+            h('b', null, 'Account key'),
+            h('span', { class: 'sub' }, 'saves you when switching devices — keep it private')
+          ),
+          h('button', { class: 'btn ghost tiny', onClick: async () => {
+            const tok = getAuth().token;
+            try { await navigator.clipboard.writeText(tok); notify('Key copied to clipboard ✓'); }
+            catch { notify('Key: ' + tok.slice(0, 4) + '…' + tok.slice(-4)); }
+          } }, 'Copy key')
+        ),
+        h('label', null, 'Reminders', h('select', {
           value: remindState, onChange: (e) => { remind.set(e.target.value); setRemindState(e.target.value); }
         }, ['off', 'gentle', 'daily'].map((v) => h('option', { value: v }, v)))),
         h('span', { class: 'push-status' }, pushEnabled ? 'Push: ON' : 'Push: OFF'),
@@ -545,9 +562,9 @@ h('label', null, 'Reminders', h('select', {
           key: t, class: 'bbtab' + (tab === t ? ' on' : ''),
           onClick: () => { setTab(t); setUnread(0); }
         },
-          t === 'reels' ? '⬤' :
-          t === 'glyphs' ? '✦' :
-          t === 'chats' ? '☗' + (unread ? ' ' + unread : '') :
+          t === 'reels' ? '❖' :
+          t === 'glyphs' ? '◆' :
+          t === 'chats' ? '✉' + (unread ? ' ' + unread : '') :
           t === 'pulse' ? '⚡' :
           '◈')
       )

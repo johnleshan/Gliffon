@@ -40,7 +40,7 @@ export function ShareSheet({ glyph, contacts = [], onSendToContact, onCastToWall
             }
             onClose();
           }
-        }, '⤴ More (native share)')
+        }, '↗ More (native share)')
       )
     )
   );
