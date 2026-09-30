@@ -195,7 +195,10 @@ export const backend = cfg
         await j('/api/wall', { method: 'POST', body: JSON.stringify(g) });
       },
       async likeWall(id) {
-        await j('/api/wall?action=like', { method: 'POST', body: JSON.stringify({ wall_id: id }) });
+        return await j('/api/wall?action=like', {
+          method: 'POST',
+          body: JSON.stringify({ wall_id: id })
+        });
       },
       async removeWall(id) {
         await j('/api/wall?id=' + id, { method: 'DELETE' });

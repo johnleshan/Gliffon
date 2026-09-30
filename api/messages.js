@@ -15,6 +15,11 @@ export default bind(async (req, res) => {
     if (!a || !b || (a !== me.id && b !== me.id)) {
       return json(res, { error: 'not your conversation' }, 403);
     }
+    // Opening the thread marks it read, which is what clears the badge.
+    await sql`
+      insert into conv_reads (conv, user_id, read_at) values (${conv}, ${me.id}, now())
+      on conflict (conv, user_id) do update set read_at = now()`;
+
     const rows = await sql`
       select m.*, u.name as sender_name, u.symbol as sender_symbol, u.glyphname as sender_handle
       from messages m left join users u on u.id = m.sender

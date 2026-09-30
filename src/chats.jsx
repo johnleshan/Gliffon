@@ -13,6 +13,19 @@ const dayLabel = (t) => {
   return DAY_FMT.format(d);
 };
 
+// Conversation list ordering label: time today, weekday this week, else date.
+const relTime = (t) => {
+  const d = new Date(t);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  if (now - d < 6 * 86400000) {
+    return d.toLocaleDateString([], { weekday: 'short' });
+  }
+  return DAY_FMT.format(d);
+};
+
 const REPLIES = [
   'felt that one ✦',
   'okay that one hit',
@@ -23,10 +36,13 @@ const REPLIES = [
 
 export function Chats({
   profile, contacts, openChat, setOpenChat, unread, setUnread,
-  liveMsg, setLiveMsg, onlineIds, backendOK, backend, event
+  liveMsg, setLiveMsg, onlineIds, conversations, onRead, backendOK, backend, event
 }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  // A thread can be opened straight from search, before the conversation list
+  // has caught up, so remember who we opened.
+  const [openedPeer, setOpenedPeer] = useState(null);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState('');
   const [found, setFound] = useState(undefined);
@@ -53,6 +69,9 @@ export function Chats({
           senderId: m.sender
         }))
       );
+      // listMessages marks the thread read server-side, so tell the parent to
+      // clear this conversation's badge.
+      if (onRead) onRead(backend.convKey(openChat));
     } else {
       setMessages(await store.listMessages(openChat));
     }
@@ -76,7 +95,19 @@ export function Chats({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, typingId]);
 
-  const active = contacts.find((c) => c.id === openChat);
+  // The open thread's peer. Resolve from the contact directory, then the
+  // conversation list, then whoever we opened from search — a thread can exist
+  // for someone who is no longer in the current directory (e.g. they blocked
+  // you), and can be opened before the conversation list refreshes.
+  const active = (() => {
+    if (!openChat) return null;
+    const fromContacts = contacts.find((c) => c.id === openChat);
+    if (fromContacts) return fromContacts;
+    if (openedPeer && openedPeer.id === openChat) return openedPeer;
+    const conv = conversations.find((c) => c.contactId === openChat);
+    if (conv) return { id: conv.contactId, name: conv.name, symbol: conv.symbol };
+    return null;
+  })();
 
   const send = async () => {
     if (!draft.trim() || !active) return;
@@ -133,7 +164,11 @@ export function Chats({
                 ),
                 h('button', {
                   class: 'btn primary',
-                  onClick: () => { setOpenChat(found.id); setAdding(false); }
+                  onClick: () => {
+                    setOpenedPeer(found);
+                    setOpenChat(found.id);
+                    setAdding(false);
+                  }
                 }, 'Open chat')
               )
             : null,
@@ -155,21 +190,39 @@ export function Chats({
           backendOK ? '+ Find someone' : '+ New chat')
       : null,
     !openChat && !adding
-      ? (contacts.length === 0
-          ? h('p', { class: 'empty' }, backendOK
-              ? 'You are live. Find people by their glyph name.'
-              : 'No conversations yet.')
-          : contacts.map((c) =>
-              h('button', { class: 'contact card', key: c.id, onClick: () => setOpenChat(c.id) },
+      ? (conversations.length
+          // Threads you've actually exchanged messages in, most recent first.
+          ? conversations.map((c) =>
+              h('button', {
+                class: 'contact card' + (c.unread ? ' unread' : ''),
+                key: c.conv,
+                onClick: () => { setOpenChat(c.contactId); setOpenedPeer(null); }
+              },
                 h('span', { class: 'avatar mini' }, c.symbol),
-                h('b', null, c.name),
-                backendOK && onlineIds[c.id]
-                  ? h('span', { class: 'dot online', title: 'online' }, '')
-                  : backendOK
-                    ? h('span', { class: 'dot', title: 'offline' }, '')
-                    : null,
-                h('span', { class: 'chev' }, '›')
-              ))
+                h('div', { class: 'contact-main' },
+                  h('div', { class: 'contact-top' },
+                    h('b', null, c.name || 'conversation'),
+                    h('span', { class: 'contact-time' }, relTime(c.lastAt))
+                  ),
+                  h('p', { class: 'msgpreview' }, c.preview)
+                ),
+                c.unread ? h('span', { class: 'unread-pip', 'aria-label': 'unread' }, '●') : null,
+                backendOK && onlineIds[c.contactId] ? h('span', { class: 'dot online' }, '') : null
+              )
+            )
+          // No threads yet — offer the people you can start one with.
+          : contacts.length === 0
+            ? h('p', { class: 'empty' }, backendOK
+                ? 'You are live. Find people by their glyph name.'
+                : 'No conversations yet.')
+            : contacts.map((c) =>
+                h('button', { class: 'contact card', key: c.id, onClick: () => { setOpenChat(c.id); setOpenedPeer(c); } },
+                  h('span', { class: 'avatar mini' }, c.symbol),
+                  h('b', null, c.name),
+                  backendOK && onlineIds[c.id] ? h('span', { class: 'dot online' }, '') : null,
+                  h('span', { class: 'chev' }, '›')
+                )
+              )
         )
       : null,
     active
@@ -216,7 +269,7 @@ export function Chats({
               onInput: (e) => setDraft(e.currentTarget.value),
               onKeyDown: (e) => { if (e.key === 'Enter') send(); }
             }),
-            h('button', { class: 'btn primary send', onClick: send }, '➤')
+            h('button', { class: 'btn primary send', onClick: send, 'aria-label': 'send message' }, '→')
           )
         )
       : null

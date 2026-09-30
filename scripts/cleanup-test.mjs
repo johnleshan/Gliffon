@@ -21,7 +21,7 @@ const rows = await sql`
      or glyphname like '@iconcheck%' or glyphname like '@prodchat%'
      or glyphname like '@persist%' or glyphname like '@multi%'
      or glyphname like '@luna%' or glyphname like '@arcus%'
-     or glyphname like '@echo%' or glyphname like '@iris%'
+     or glyphname like '@echo%' or glyphname like '@iris%' or glyphname like '@aaa%' or glyphname like '@bbb%' or glyphname like '@ccc%'
      or glyphname like '@fable%' or glyphname like '@ember%'
      or glyphname like '@vibe%' or glyphname like '@serin%'
      or glyphname like '@nova%' or glyphname like '@glow1%'`;

@@ -6,7 +6,7 @@ import { at } from './backend.js';
 export function Reels({
   glyphs, like, onShare, openComments, comments, addComment, commentsOpen,
   onlineIds, meId, profile, following, toggleFollow, blockUser,
-  reportGlyph, reportUser, event
+  reportGlyph, reportUser, event, feedFilter, followingCount
 }) {
   const [active, setActive] = useState(0);
   const [liked, setLiked] = useState({});
@@ -37,8 +37,13 @@ export function Reels({
   if (glyphs.length === 0) {
     return h('div', { class: 'reels-empty' },
       h('div', { class: 'preview-glyph glow' }, '✦'),
-      h('p', null, 'Your stream is empty'),
-      h('p', { class: 'sub' }, 'Cast your first glyph to start the flow')
+      feedFilter === 'following'
+        ? h('p', null, 'You are not following anyone yet')
+        : h('p', null, 'Your stream is empty'),
+      h('p', { class: 'sub' },
+        feedFilter === 'following'
+          ? 'Follow people from their glyph pages, or tap All to see everyone'
+          : 'Cast your first glyph to start the flow')
     );
   }
 
@@ -111,7 +116,9 @@ export function Reels({
             onClick: () => openComments(g)
           },
             h('span', null, '💬'),
-            h('small', { class: 'count' }, (comments[g.id] || []).length)
+            // Live count from the server, not the length of the array we only
+            // fetch when the panel is opened.
+            h('small', { class: 'count' }, g.commentCount || (comments[g.id] || []).length || 0)
           ),
           g.who && !isMe && h('button', {
             class: 'act' + (isFollowing ? ' following' : ''),

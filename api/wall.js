@@ -28,23 +28,24 @@ export default bind(async (req, res) => {
 
     const target = await sql`select author from wall where id = ${b.wall_id} limit 1`;
     if (!target.length) return json(res, { error: 'not found' }, 404);
-    if (target[0].author === me.id) return json(res, { error: 'cannot like your own glyph' }, 400);
 
     await sql`insert into likes (wall_id, user_id) values (${b.wall_id}, ${me.id})`;
     await sql`update wall set likes = likes + 1 where id = ${b.wall_id}`;
 
-    const owner = await sql`
-      select w.label, u.glyphname from wall w
-      join users u on u.id = w.author where w.id = ${b.wall_id} limit 1`;
-    if (owner.length) {
-      sendToUser(sql, target[0].author, {
-        title: `${me.glyphname} liked your glyph`,
-        body: `${me.symbol} "${owner[0].label}"`,
-        icon: '/icon.svg',
-        data: { url: '/g/' + b.wall_id }
-      }).catch(() => {});
+    // Notify the owner, but never notify yourself about your own like.
+    if (target[0].author !== me.id) {
+      const owner = await sql`
+        select w.label from wall w where w.id = ${b.wall_id} limit 1`;
+      if (owner.length) {
+        sendToUser(sql, target[0].author, {
+          title: `${me.glyphname} liked your glyph`,
+          body: `${me.symbol} "${owner[0].label}"`,
+          icon: '/icon.svg',
+          data: { url: '/g/' + b.wall_id }
+        }).catch(() => {});
+      }
     }
-    return json(res, { ok: true });
+    return json(res, { ok: true, likes: true });
   }
 
   if (req.method === 'POST') {

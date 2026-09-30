@@ -153,6 +153,7 @@ export function App() {
   const [activity, setActivity] = useState([]);
   const [commentsOpen, setCommentsOpen] = useState(null);
   const [comments, setComments] = useState({});
+  const [conversations, setConversations] = useState([]);
   const [feedFilter, setFeedFilter] = useState('all'); // 'all' | 'following'
   const openRef = useRef(null);
   openRef.current = openChat;
@@ -281,27 +282,67 @@ export function App() {
 
     const tick = setInterval(async () => {
       if (document.visibilityState === 'hidden' || !alive || !backend) return;
+      const meId = getMyId();
+      if (!meId) return;
       try {
-        backend.heartbeat();
-        const meId = getMyId();
-        if (!meId) return;
+        // Heartbeat is presence only; never let it break the update cycle.
+        backend.heartbeat().catch(() => {});
         const d = await backend.live(msgCursor.current);
+        // Only advance the cursor after a successful read, so a failed poll
+        // replays the same window instead of silently dropping messages.
         msgCursor.current = Date.now() - 1000;
 
-        // DMs
+        // Direct messages.
+        // The unread badge is driven by the server's per-conversation read
+        // markers, not by counting deltas here — a delta count and the thread
+        // itself could disagree, which is what produced phantom unread badges.
         if (d.msgs && d.msgs.length) {
           for (const m of d.msgs) {
             const opened = convOpen(m.conv, openRef.current);
             if (!opened) {
-              setUnread((n) => n + 1);
               notify(`${at(m.sender_handle, m.sender_name)} · ${m.sender_name || 'someone'}: ${m.text.slice(0, 34)}`);
+              pushActivity(`Message from ${at(m.sender_handle, m.sender_name)}`, m.created);
             }
           }
           setLiveMsg(d);
         }
 
-        // Wall (new casts/removed casts/likes)
-        const wallKey = d.wall.map((r) => `${r.id}:${r.likes}`).join(',') + `#${d.wall.length}`;
+        // Conversation list: recency order + per-person unread counts.
+        if (d.conversations) {
+          const readAt = {};
+          for (const r of d.read || []) readAt[r.conv] = new Date(r.read_at).getTime();
+          const peers = {};
+          for (const u of contacts) peers[u.id] = u;
+          const meIdNow = getMyId();
+          const list = d.conversations.map((c) => {
+            const otherId = c.conv.split('|').find((x) => x !== meIdNow) || '';
+            // Label the row with the OTHER person, not whoever sent last — the
+            // last sender is often me.
+            const peer = peers[otherId] || {};
+            const peerName = c.peer_handle || peer.glyphname || peer.name || (otherId ? 'someone' : '');
+            const since = readAt[c.conv] || 0;
+            const lastAt = new Date(c.last_at).getTime();
+            return {
+              conv: c.conv,
+              contactId: otherId,
+              name: at(peerName, ''),
+              symbol: c.peer_symbol || peer.symbol || '✦',
+              preview: c.last_text || '',
+              lastAt,
+              // Unread only when the newest message is from them and lands
+              // after our last read of this thread.
+              unread: lastAt > since && c.last_sender !== meIdNow ? 1 : 0
+            };
+          });
+          setConversations(list);
+        }
+
+        // Wall (new casts / removed casts / likes / comment counts)
+        // The key includes comment counts so a new comment updates the badge
+        // without anyone opening the comments panel.
+        const wallKey = d.wall
+          .map((r) => `${r.id}:${r.likes}:${r.comments || 0}`)
+          .join(',') + `#${d.wall.length}`;
         if (wallKey !== prevWallKey.current) {
           const likedIds = new Set((d.liked || []).map((l) => l.wall_id));
           for (const l of d.liked || []) {
@@ -321,6 +362,7 @@ export function App() {
           setGlyphs(d.wall.map((r) => ({
             id: r.id, kind: r.kind, symbol: r.symbol, label: r.label,
             note: r.note || undefined, likes: r.likes || 0,
+            commentCount: r.comments || 0,
             created: new Date(r.created).getTime(),
             who: {
               name: r.author_name || r.author_handle || 'unknown',
@@ -357,14 +399,42 @@ export function App() {
     return () => { alive = false; clearInterval(tick); };
   }, [profile, backendOK]);
 
+  // Coming back to the tab should catch up immediately rather than waiting for
+  // the next poll, and the tab needs to stay current while it is in view.
+  useEffect(() => {
+    if (!profile || !backendOK || !backend) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        msgCursor.current = Date.now() - 15000;
+        refresh().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [profile, backendOK]);
+
   const like = async (g) => {
-    setGlyphs((list) => list.map((x) => (x.id === g.id ? { ...x, likes: (x.likes || 0) + 1 } : x)));
     if (backendOK && backend) {
-      await backend.likeWall(g.id);
-      event('like', { glyphId: g.id });
-    } else {
-      await store.like(g.id);
+      // The server is the source of truth. Optimistic increments used to run
+      // first, so a rejected like (e.g. already liked) left a phantom count.
+      try {
+        const r = await backend.likeWall(g.id);
+        if (r && r.already) {
+          notify('Already liked ✓');
+          return;
+        }
+        event('like', { glyphId: g.id });
+      } catch (e) {
+        notify(e.message);
+      }
+      return;
     }
+    setGlyphs((list) => list.map((x) => (x.id === g.id ? { ...x, likes: (x.likes || 0) + 1 } : x)));
+    await store.like(g.id);
   };
 
   const openComments = async (g) => {
@@ -382,6 +452,10 @@ export function App() {
       await backend.addComment(g.id, text);
       const cs = await backend.listComments(g.id);
       setComments((prev) => ({ ...prev, [g.id]: cs }));
+      // Reflect the new comment in the rail counter immediately.
+      setGlyphs((list) => list.map((x) =>
+        x.id === g.id ? { ...x, commentCount: (x.commentCount || 0) + 1 } : x
+      ));
     }
   };
 
@@ -498,6 +572,10 @@ export function App() {
     ? visibleGlyphs.filter((g) => following.has(g.who.rid))
     : visibleGlyphs;
 
+  // One source of truth for the chat badge: how many conversations have
+  // something unread, regardless of which tab is open.
+  const unreadTotal = conversations.filter((c) => c.unread).length;
+
   return h('div', { id: 'app' },
     h('header', { class: 'appbar' },
       h('span', { class: 'brand', onClick: () => setTab('reels') }, 'Gliffon'),
@@ -507,14 +585,23 @@ export function App() {
           h('button', {
             key: t, class: 'tab' + (tab === t ? ' on' : ''),
             onClick: () => { setTab(t); setUnread(0); }
-          }, t.charAt(0).toUpperCase() + t.slice(1))
+          }, t.charAt(0).toUpperCase() + t.slice(1),
+            t === 'chats' && unreadTotal
+              ? h('span', { class: 'tab-badge' }, unreadTotal > 9 ? '9+' : unreadTotal)
+              : null
+          )
         )
       ),
     h('div', { class: 'header-actions' },
-      h('button', { class: 'iconbtn', title: 'Feed filter', onClick: () => setFeedFilter((f) => f === 'all' ? 'following' : 'all') },
-        feedFilter === 'following' ? 'Following' : 'All'
-      ),
-      h('button', { class: 'iconbtn', title: 'Cast a glyph', onClick: () => setTab('composer') }, '✦'),
+      h('button', {
+        class: 'iconbtn' + (feedFilter === 'following' ? ' on' : ''),
+        title: feedFilter === 'all'
+          ? 'All — every glyph in the community. Tap to show only people you follow.'
+          : 'Following — only glyphs from people you follow. Tap to see everyone.',
+        'aria-label': 'Feed filter: ' + feedFilter,
+        onClick: () => setFeedFilter((f) => (f === 'all' ? 'following' : 'all'))
+      }, feedFilter === 'following' ? 'Following' : 'All'),
+      h('button', { class: 'iconbtn', title: 'Cast a glyph', onClick: () => setTab('glyphs') }, '✦'),
       h('button', { class: 'iconbtn', title: 'Sign out', onClick: signOut, 'aria-label': 'Sign out' },
         h('svg', { viewBox: '0 0 24 24', width: 20, height: 20, 'aria-hidden': 'true', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round' },
           h('path', { d: 'M12 3v8' }),
@@ -530,7 +617,7 @@ export function App() {
       glyphs: filteredGlyphs, like, onShare: (g) => setShareTarget(g),
       openComments, comments, addComment, commentsOpen,
       onlineIds, meId: getMyId(), profile, following, toggleFollow, blockUser,
-      reportGlyph, reportUser, event
+      reportGlyph, reportUser, event, feedFilter, followingCount: following.size
     }),
 
     tab === 'glyphs' && h(Composer, {
@@ -550,7 +637,9 @@ export function App() {
 
     tab === 'chats' && h(Chats, {
       profile, contacts, openChat, setOpenChat, unread, setUnread,
-      liveMsg, setLiveMsg, onlineIds, backendOK, backend, event
+      liveMsg, setLiveMsg, onlineIds, conversations,
+      onRead: (conv) => setConversations((cs) => cs.map((c) => (c.conv === conv ? { ...c, unread: 0 } : c))),
+      backendOK, backend, event
     }),
 
     tab === 'pulse' && h(Pulse, {
@@ -622,7 +711,7 @@ export function App() {
         },
           t === 'reels' ? '❖' :
           t === 'glyphs' ? '◆' :
-          t === 'chats' ? '✉' + (unread ? ' ' + unread : '') :
+          t === 'chats' ? '✉' + (unreadTotal ? ' ' + unreadTotal : '') :
           t === 'pulse' ? '⚡' :
           '◈')
       )
