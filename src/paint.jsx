@@ -344,7 +344,7 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
         h('p', { class: 'eyebrow' }, 'The paint screen'),
         h('h3', null, 'Paint a glyph')
       ),
-      h('p', { class: 'sub' }, 'Freehand strokes in full colour. Pick your canvas shape — you can rotate nothing later, choose the frame that fits the feeling.'),
+      h('p', { class: 'sub' }, 'Freehand strokes in full colour. Pick the frame that fits the feeling — the shape is chosen for the whole painting.'),
       h('div', { class: 'orientation' },
         h('button', { class: 'orientcard portrait', onClick: () => pickOrientation('portrait') },
           h('i', null),

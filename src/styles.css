@@ -1944,5 +1944,17 @@ button.stat:hover { border-color: rgb(var(--gold-rgb) / 0.35); box-shadow: 0 6px
 .brushdock input[type=range] { flex: 1; min-width: 70px; accent-color: var(--gold); }
 .dockspacer { display: none; }
 
-/* the eraser's circle of truth — what it covers is exactly what it cuts */
+/* the eraser's circle of truth ï¿½ what it covers is exactly what it cuts */
 .erasering { pointer-events: none; mix-blend-mode: screen; }
+
+/* ---------- tightest phones (<=359px): compress chrome so nothing clips ---------- */
+@media (max-width: 359px) {
+  .appbar { gap: 6px; padding-inline: 10px; }
+  .brand { font-size: 17px; }
+  .paint { padding-top: calc(env(safe-area-inset-top) + 118px); }
+  .tabs { gap: 2px; padding: 3px; }
+  .tab { min-width: 0; font-size: 11px; padding: 7px 4px; }
+  .bottombar { gap: 2px; padding-inline: 8px; }
+  .bbtab { min-width: 0; padding-inline: 4px; height: 44px; font-size: 17px; }
+  .appbar .header-actions .iconbtn { width: 32px; height: 32px; }
+}
