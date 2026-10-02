@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { KINDS } from './store.js';
 import { at } from './backend.js';
+import { PaintedGlyph } from './paint.jsx';
 
 export function Reels({
   glyphs, like, onShare, openComments, comments, addComment, commentsOpen,
@@ -65,13 +66,15 @@ export function Reels({
         h('div', { class: 'reel-orb orb2', 'aria-hidden': 'true' }),
         h('div', { class: 'reel-center' },
           h('div', { class: 'reel-stage' },
-            h('span', { class: 'reel-glyph glow' }, g.symbol)
+            g.svg
+              ? h(PaintedGlyph, { svg: g.svg })
+              : h('span', { class: 'reel-glyph glow' }, g.symbol)
           )
         ),
         h('div', { class: 'reel-meta glass' },
           h('div', null,
             h('span', { class: 'kicker' },
-              (KINDS.find((k) => k.kind === g.kind) || {}).name || 'Glyph'),
+              g.kind === 'painted' ? 'Painted' : (KINDS.find((k) => k.kind === g.kind) || {}).name || 'Glyph'),
             h('div', { class: 'metaline' },
               h('span', { class: 'who' },
                 at(g.who && g.who.glyphname, g.who && g.who.name) || 'unknown',
@@ -133,7 +136,7 @@ export function Reels({
             onClick: () => setMenuFor(menuFor === g.id ? null : g.id)
           }, h('span', null, '⋯')),
           h('small', { class: 'kindlabel' },
-            (KINDS.find((k) => k.kind === g.kind) || {}).name || 'Glyph'
+            g.kind === 'painted' ? 'Painted' : (KINDS.find((k) => k.kind === g.kind) || {}).name || 'Glyph'
           ),
           menuFor === g.id && h('div', { class: 'reelmenu glass' },
             h('button', { class: 'mi', onClick: () => { navigator.clipboard?.writeText(location.origin + '/g/' + g.id); setMenuFor(null); event('copy_link', { glyphId: g.id }); } },

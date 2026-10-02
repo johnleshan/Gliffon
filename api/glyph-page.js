@@ -16,15 +16,23 @@ export default bind(async (req, res) => {
   const id = url.searchParams.get('id');
   if (!id) {
     res.statusCode = 400;
-    res.setHeader('content-type', 'text/html; charset=utf-8');
+// A painted glyph is rendered as its actual drawing (cleanSvg has already
+// vetted the markup against the painter's grammar), not as the fallback symbol.
+const svgTag = (s) =>
+  s && s.startsWith('<svg')
+    ? s.replace('<svg ', '<svg style="width:9rem;height:auto;display:block;margin:0 auto" aria-hidden="true" ')
+    : '';
+
+res.setHeader('content-type', 'text/html; charset=utf-8');
     return res.end('<!doctype html><meta charset="utf-8"><p>Missing glyph id.</p>');
   }
 
   let row = null;
+  let svg = '';
   try {
     const sql = conn();
     const rows = await sql`
-      select w.id, w.label, w.symbol, w.note, w.likes, w.created,
+      select w.id, w.label, w.symbol, w.note, w.likes, w.created, w.svg,
              u.name as author_name, u.symbol as author_symbol, u.glyphname as author_handle
       from wall w left join users u on u.id = w.author
       where w.id = ${id} limit 1`;
@@ -59,7 +67,7 @@ export default bind(async (req, res) => {
   </head>
   <body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#070b18;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;text-align:center;padding:2rem">
     <main>
-      <div style="font-size:5rem;line-height:1;background:radial-gradient(circle at 50% 42%, rgb(139 123 255 / .22), transparent 65%);border-radius:50%">${esc(row ? row.symbol : '◈')}</div>
+      <div style="font-size:5rem;line-height:1;border-radius:50%">${row && row.svg ? svgTag(row.svg) : esc(row ? row.symbol : '◈')}</div>
       <h1 style="font-size:1.75rem;margin:1rem 0 .35rem">${esc(row ? row.label || 'A glyph' : 'This glyph is no longer available')}</h1>
       <p style="color:#ffc46b;margin:0 0 .35rem">${esc(row ? (row.author_symbol || '✦') + ' ' + who : 'Gliffon')}</p>
       <p style="color:#9fadd0;margin:0">${esc(row ? row.likes + ' likes' : 'Say it in symbols.')}</p>

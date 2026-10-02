@@ -203,6 +203,18 @@ export const backend = cfg
       async removeWall(id) {
         await j('/api/wall?id=' + id, { method: 'DELETE' });
       },
+      // painted glyphs: personal collection lives alongside the wall API
+      async listPaintings() {
+        return await j('/api/wall?action=paintings');
+      },
+      async savePainting(svg) {
+        return await j('/api/wall?action=painting', {
+          method: 'POST', body: JSON.stringify({ svg })
+        });
+      },
+      async removePainting(id) {
+        await j('/api/wall?action=painting&id=' + encodeURIComponent(id), { method: 'DELETE' });
+      },
       convKey(friendId) {
         return [myUserId, friendId].filter(Boolean).sort().join('|');
       },

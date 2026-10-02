@@ -2,6 +2,7 @@ import { h, Fragment } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { store, KINDS, uid } from './store.js';
 import { Composer } from './composer.jsx';
+import { Paint, PaintedGlyph } from './paint.jsx';
 import { Auth } from './auth.jsx';
 import { remind, glyphCard } from './share.js';
 import { Pulse } from './pulse.jsx';
@@ -45,7 +46,7 @@ function PublicGlyph({ glyphId }) {
   const who = g.author_name || g.author_handle || 'someone';
   return h('div', { class: 'publicglyph' },
     h('div', { class: 'card pgcard' },
-      h('span', { class: 'preview-glyph glow' }, g.symbol),
+      g.svg ? h(PaintedGlyph, { svg: g.svg }) : h('span', { class: 'preview-glyph glow' }, g.symbol),
       h('h2', null, g.label || 'A glyph'),
       g.note ? h('p', { class: 'sub' }, g.note) : null,
       h('p', { class: 'pgwho' }, `${g.author_symbol || '✦'} ${who}`),
@@ -191,7 +192,7 @@ export function App() {
       setContacts(users.filter((u) => u.id !== getMyId() && !blocked.has(u.id)));
       setGlyphs(wall.map((r) => ({
         id: r.id, kind: r.kind, symbol: r.symbol, label: r.label,
-        note: r.note || undefined, likes: r.likes || 0,
+        note: r.note || undefined, likes: r.likes || 0, svg: r.svg || undefined,
         created: new Date(r.created).getTime(),
         who: {
           name: (who[r.author] || {}).name || (who[r.author] || {}).glyphname || 'unknown',
@@ -361,7 +362,7 @@ export function App() {
           prevWallKey.current = wallKey;
           setGlyphs(d.wall.map((r) => ({
             id: r.id, kind: r.kind, symbol: r.symbol, label: r.label,
-            note: r.note || undefined, likes: r.likes || 0,
+            note: r.note || undefined, likes: r.likes || 0, svg: r.svg || undefined,
             commentCount: r.comments || 0,
             created: new Date(r.created).getTime(),
             who: {
@@ -581,7 +582,7 @@ export function App() {
       h('span', { class: 'brand', onClick: () => setTab('reels') }, 'Gliffon'),
       backendOK && h('span', { class: 'live-indicator' }, 'live'),
       h('div', { class: 'tabs' },
-        ['reels', 'glyphs', 'chats', 'pulse', 'profile'].map((t) =>
+        ['reels', 'glyphs', 'paint', 'chats', 'pulse', 'profile'].map((t) =>
           h('button', {
             key: t, class: 'tab' + (tab === t ? ' on' : ''),
             onClick: () => { setTab(t); setUnread(0); }
@@ -640,6 +641,22 @@ export function App() {
       liveMsg, setLiveMsg, onlineIds, conversations,
       onRead: (conv) => setConversations((cs) => cs.map((c) => (c.conv === conv ? { ...c, unread: 0 } : c))),
       backendOK, backend, event
+    }),
+
+    tab === 'paint' && h(Paint, {
+      profile, backendOK, backend, notify,
+      onCast: async (g) => {
+        if (backendOK && backend) {
+          await backend.addToWall(g);
+          event('paint_cast', {});
+          notify('Painted glyph cast ✓');
+        } else {
+          await store.addGlyph(g);
+          notify('Pinned locally ✓ (connect for the global Wall)');
+        }
+        setTab('reels');
+        refresh();
+      }
     }),
 
     tab === 'pulse' && h(Pulse, {
@@ -704,13 +721,16 @@ export function App() {
     ),
 
     h('footer', { class: 'bottombar' },
-      ['reels', 'glyphs', 'chats', 'pulse', 'profile'].map((t) =>
+      ['reels', 'glyphs', 'paint', 'chats', 'pulse', 'profile'].map((t) =>
         h('button', {
           key: t, class: 'bbtab' + (tab === t ? ' on' : ''),
-          onClick: () => { setTab(t); setUnread(0); }
+          onClick: () => { setTab(t); setUnread(0); },
+          'aria-label': t
         },
           t === 'reels' ? '❖' :
           t === 'glyphs' ? '◆' :
+          t === 'paint' ? h('svg', { viewBox: '0 0 24 24', width: 20, height: 20, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'aria-hidden': 'true' },
+            h('path', { d: 'M17 3l4 4L8 20l-5 1 1-5L17 3z' })) :
           t === 'chats' ? '✉' + (unreadTotal ? ' ' + unreadTotal : '') :
           t === 'pulse' ? '⚡' :
           '◈')

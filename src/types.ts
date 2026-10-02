@@ -1,4 +1,4 @@
-export type GlyphKind = 'love' | 'mood' | 'memory' | 'creativity';
+export type GlyphKind = 'love' | 'mood' | 'memory' | 'creativity' | 'painted';
 
 export interface Glyph {
   id: string;
@@ -8,6 +8,7 @@ export interface Glyph {
   note?: string;
   created: number;
   moodTag?: string;
+  svg?: string;
 }
 
 export interface Profile {

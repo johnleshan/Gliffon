@@ -14,7 +14,7 @@ export default bind(async (req, res) => {
   // wall + authors, with a live comment count so counters stay accurate
   // without anyone having to open the comments panel.
   const wall = await sql`
-    select wall.id, wall.likes, wall.created, wall.kind, wall.symbol, wall.label, wall.note, wall.author,
+    select wall.id, wall.likes, wall.created, wall.kind, wall.symbol, wall.label, wall.note, wall.author, wall.svg,
            u.name as author_name, u.symbol as author_symbol, u.glyphname as author_handle,
            (select count(*)::int from comments c where c.wall_id = wall.id) as comments
     from wall left join users u on u.id = wall.author

@@ -1,10 +1,22 @@
-import { conn, bind, json, readBody, authUser, rate } from './_db.js';
+import { conn, bind, json, readBody, authUser, rate, cleanSvg } from './_db.js';
 import { sendToUser } from './_push.js';
 
 export default bind(async (req, res) => {
   const sql = conn();
   const url = new URL(req.url, 'http://x');
   const action = url.searchParams.get('action') || '';
+  const id = url.searchParams.get('id');
+
+  // paintings reads belong to their owner and need auth, so they are checked
+  // before the anonymous wall list below swallows every GET.
+  if (action === 'paintings') {
+    const me = await authUser(sql, req);
+    if (!me) return json(res, { error: 'sign in required' }, 401);
+    const rows = await sql`
+      select id, svg, created from paintings where user_id = ${me.id}
+      order by created desc limit 200`;
+    return json(res, rows);
+  }
 
   if (req.method === 'GET') {
     const rows = await sql`
@@ -16,6 +28,30 @@ export default bind(async (req, res) => {
 
   const me = await authUser(sql, req);
   if (!me) return json(res, { error: 'sign in required' }, 401);
+
+
+  // ---- personal painting collection ----
+  // POST ?action=painting  body { id?, svg }  -> save to my collection
+  if (req.method === 'POST' && action === 'painting') {
+    if (!rate(req, res, { key: 'paintsave', max: 40, windowMs: 60000 })) return;
+    const b = await readBody(req);
+    const svg = cleanSvg(b.svg);
+    if (!svg) return json(res, { error: 'invalid or missing svg' }, 400);
+    const id = String(b.id || '').slice(0, 40) || crypto.randomUUID();
+    await sql`
+      insert into paintings (id, user_id, svg) values (${id}, ${me.id}, ${svg})
+      on conflict (id) do update set svg = excluded.svg, created = now()`;
+    return json(res, { ok: true, id });
+  }
+
+  // DELETE ?action=painting&id=...  -> remove one of my paintings
+  if (req.method === 'DELETE' && action === 'painting') {
+    const rows = await sql`select user_id from paintings where id = ${id}`;
+    if (!rows.length) return json(res, { error: 'not found' }, 404);
+    if (rows[0].user_id !== me.id) return json(res, { error: 'not yours' }, 403);
+    await sql`delete from paintings where id = ${id}`;
+    return json(res, { ok: true });
+  }
 
   // Attributed like: POST /api/wall?action=like  body { wall_id }
   if (req.method === 'POST' && action === 'like') {
@@ -52,14 +88,20 @@ export default bind(async (req, res) => {
     if (!rate(req, res, { key: 'cast', max: 30, windowMs: 60000 })) return;
     const g = await readBody(req);
     if (!g.label || !g.kind) return json(res, { error: 'kind and label required' }, 400);
+    // Painted glyphs ship their drawing; anything claiming to be svg is
+    // validated against the painter's grammar or dropped.
+    let svg = null;
+    if (g.svg) {
+      svg = cleanSvg(g.svg);
+      if (!svg) return json(res, { error: 'invalid svg' }, 400);
+      if (g.kind !== 'painted') return json(res, { error: 'svg only for painted casts' }, 400);
+    }
     await sql`
-      insert into wall (id, kind, symbol, label, note, likes, author)
-      values (${g.id}, ${g.kind}, ${g.symbol}, ${String(g.label).slice(0, 280)}, ${(g.note || '').slice(0, 600) || null}, 0, ${me.id})
+      insert into wall (id, kind, symbol, label, note, likes, author, svg)
+      values (${g.id}, ${g.kind}, ${g.symbol}, ${String(g.label).slice(0, 280)}, ${(g.note || '').slice(0, 600) || null}, 0, ${me.id}, ${svg})
       on conflict (id) do nothing`;
     return json(res, { ok: true });
   }
-
-  const id = url.searchParams.get('id');
 
   if (req.method === 'DELETE') {
     const rows = await sql`select author from wall where id = ${id}`;

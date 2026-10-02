@@ -51,6 +51,60 @@ export function readBody(req) {
 export const hashToken = (t) => createHash('sha256').update(String(t)).digest('hex');
 export const newToken = () => randomBytes(32).toString('base64url');
 
+// Painted glyph markup is user-authored, so it never goes near the DOM
+// unchecked: strict allowlist of exactly what the painter generates
+// (<svg viewBox> [ <g attrs> ] <path d stroke …/>… [ </g> ] ), everything
+// else — scripts, handlers, hrefs, embedded images — is rejected outright.
+const SVG_OPEN = /^<svg\s+xmlns="http:\/\/www\.w3\.org\/2000\/svg"\s+viewBox="0 0 [1-9]\d* [1-9]\d*">$/;
+const SVG_GROUP = /^<g\s+(?:[a-zA-Z][\w-]*="[^"<>]*"\s*)+>$/;
+const SVG_PATH =
+  /^<path\s+(?:[a-zA-Z][\w-]*="[^"<>]*"\s*)+\/>$/;
+export function cleanSvg(raw) {
+  const s = String(raw || '').trim();
+  if (!s || s.length > 150000 || !s.endsWith('</svg>')) return null;
+  const parts = s.match(/<[^>]+>|[^<]+/g) || [];
+  let depth = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (!p.trim()) continue; // whitespace between tags
+    if (i === 0) {
+      // tag 1: the svg root with only xmlns + numeric viewBox
+      if (!SVG_OPEN.test(p)) return null;
+      continue;
+    }
+    if (p === '</svg>' && i === parts.length - 1 && depth === 0) break;
+    if (p === '</g>') {
+      if (--depth < 0) return null;
+      continue;
+    }
+    if (p.startsWith('<g')) {
+      if (depth > 0 || depth !== 0) return null; // no nested groups
+      if (!SVG_GROUP.test(p)) return null;
+      const attrs = p.match(/[a-zA-Z][\w-]*="[^"<>]*"/g).join(' ');
+      if (attrs !== 'fill="none" stroke-linecap="round" stroke-linejoin="round"') return null;
+      depth = 1;
+      continue;
+    }
+    // everything else must be a plain <path/> with a sane d + color attrs
+    if (!SVG_PATH.test(p)) return null;
+    const d = p.match(/\bd="([^"<>]*)"/);
+    if (!d || !/^[MmLlCcQqAaHhVvZz0-9eE+\-., ]+$/.test(d[1]) || d[1].length > 40000) return null;
+    for (const attr of p.match(/[a-zA-Z][\w-]*="[^"<>]*"/g)) {
+      const [name, val] = attr.split('=');
+      const v = val.slice(1, -1);
+      if (name === 'd') continue;
+      if (name === 'stroke' && /^#[0-9a-fA-F]{3,8}$/.test(v)) continue;
+      if (name === 'stroke-width' && /^\d+(\.\d+)?$/.test(v) && +v <= 64) continue;
+      return null; // stroke/fill/linecap/opacity/anything else — from us only
+    }
+    // our painter emits only d + stroke + stroke-width
+    const names = p.match(/[a-zA-Z][\w-]*=/g).map((x) => x.slice(0, -1)).sort().join(',');
+    if (names !== 'd,stroke,stroke-width') return null;
+    if (depth !== 1) return null;
+  }
+  return /<path/.test(s) ? s : null;
+}
+
 // Password hashing: scrypt, per-user random salt, constant-time compare.
 // Stored as scrypt$N$r$p$salt$key so parameters can change over time.
 export function hashPassword(password) {
