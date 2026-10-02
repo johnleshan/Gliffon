@@ -1857,3 +1857,15 @@ button.contact .dot { flex: none; align-self: center; }
 }
 .shelfdel:hover { background: rgb(var(--rose-rgb) / 0.25); }
 .paint .row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* profile stats are interactive — they are doors, not labels */
+button.stat { background: var(--statc, rgb(var(--rose-rgb) / 0.09)); border: 0; padding: 14px 10px 12px; cursor: pointer; color: var(--text); }
+button.stat:hover { border-color: rgb(var(--gold-rgb) / 0.35); box-shadow: 0 6px 20px -10px rgb(var(--gold-rgb) / 0.4); }
+
+/* profile sheet rows */
+.sheet .contact { display: flex; gap: 10px; align-items: center; justify-content: flex-start; cursor: pointer; text-align: left; }
+.sheet .contact .devinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+.sheet .contact .devinfo b { color: var(--text); font-size: 14px; }
+.sheet .contact .devinfo .sub { font-size: 11.5px; }
+.sheet .empty { color: var(--muted); font-size: 13.5px; margin: 8px 0 2px; }
+.sheet .btn.tiny { padding: 6px 12px; font-size: 11.5px; }

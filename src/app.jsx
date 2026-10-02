@@ -134,6 +134,51 @@ function setMeta(property, content) {
   el.setAttribute('content', content);
 }
 
+// Opens from any profile stat: followers, following, contacts, or the user's
+// own casts. Each row carries the action it implies — follow back, unfollow,
+// open a chat, delete a cast — so the lists are workbenches, not readouts.
+function ProfileSheet({ kind, title, rows, following, onClose, onToggleFollow, onOpenChat, onDeleteCast, notify }) {
+  const empties = {
+    followers: 'Nobody follows you yet — share a glyph to gather eyes.',
+    following: 'You are not following anyone yet.',
+    contacts: 'No contacts yet — start a chat from the People tab.',
+    casts: 'No casts yet. Cast or paint your first glyph.'
+  };
+  return h('div', { class: 'share-sheet', onClick: onClose },
+    h('div', { class: 'sheet glass', onClick: (e) => e.stopPropagation() },
+      h('h3', null, title),
+      h('div', { class: 'sharemain' },
+        (!rows || rows.length === 0)
+          ? h('p', { class: 'empty' }, empties[kind] || 'Nothing here yet')
+          : rows.map((r) =>
+              kind === 'casts'
+                ? h('div', { class: 'contact card', key: r.id },
+                    h('div', { class: 'devinfo' },
+                      h('b', null, r.label || 'A glyph'),
+                      h('span', { class: 'sub' }, `${r.likes || 0} likes · ${new Date(r.created).toLocaleDateString()}`)
+                    ),
+                    h('button', { class: 'btn ghost tiny', onClick: async () => {
+                      try { await onDeleteCast(r.id); } catch (e) { notify(e.message); }
+                    } }, 'Delete')
+                  )
+                : h('div', { class: 'contact card', key: r.id, onClick: kind === 'contacts' ? () => onOpenChat(r) : undefined,
+                    role: kind === 'contacts' ? 'button' : undefined },
+                    h('span', { class: 'avatar mini' }, r.symbol || '✦'),
+                    h('div', { class: 'devinfo' },
+                      h('b', null, at(r.glyphname, r.name) || r.name || 'someone'),
+                      r.name ? h('span', { class: 'sub' }, r.name) : null
+                    ),
+                    kind !== 'contacts' && h('button', {
+                      class: 'btn ghost tiny', onClick: (e) => { e.stopPropagation(); onToggleFollow(r); }
+                    }, following.has(r.id) ? 'Unfollow' : (kind === 'followers' ? 'Follow back' : 'Follow'))
+                  )
+            ),
+        h('button', { class: 'btn ghost tiny', onClick: onClose }, 'Close')
+      )
+    )
+  );
+}
+
 export function App() {
   const [profile, setProfile] = useState(undefined);
   const [glyphs, setGlyphs] = useState([]);
@@ -149,7 +194,10 @@ export function App() {
   const [unread, setUnread] = useState(0);
   const [onlineIds, setOnlineIds] = useState({});
   const [following, setFollowing] = useState(new Set());
+  const [followers, setFollowers] = useState([]);
   const [blockedUsers, setBlockedUsers] = useState([]);
+  const [sheet, setSheet] = useState(null);
+  const [sheetData, setSheetData] = useState([]);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [activity, setActivity] = useState([]);
   const [commentsOpen, setCommentsOpen] = useState(null);
@@ -178,13 +226,15 @@ export function App() {
 
   const refresh = async () => {
     if (backendOK && backend) {
-      const [wall, users, follows, blocks] = await Promise.all([
+      const [wall, users, follows, blocks, followerRows] = await Promise.all([
         backend.listWall(),
         backend.listUsers(),
         backend.listFollows('following'),
-        backend.listBlocks()
+        backend.listBlocks(),
+        backend.listFollows('followers')
       ]);
       setFollowing(new Set(follows.map((f) => f.id)));
+      setFollowers(followerRows);
       setBlockedUsers(blocks);
       const blocked = new Set(blocks.map((b) => b.id));
       const who = {};
@@ -504,6 +554,35 @@ export function App() {
     notify('Reported — thank you');
   };
 
+  const removeCast = async (id) => {
+    if (backendOK && backend) {
+      await backend.removeWall(id);
+      setGlyphs((list) => list.filter((x) => x.id !== id));
+      setSheetData((rows) => rows.filter((r) => r.id !== id));
+      notify('Cast removed');
+      refresh();
+    }
+  };
+
+  // Profile stat sheets: every number on the profile is a door, not a label.
+  const openSheet = async (kind) => {
+    if (!backend || !backendOK) { notify('Connect to see the social graph'); return; }
+    setSheet(kind);
+    try {
+      if (kind === 'followers') setSheetData(await backend.listFollows('followers'));
+      else if (kind === 'following') setSheetData(await backend.listFollows('following'));
+      else if (kind === 'contacts') setSheetData(contacts);
+      else if (kind === 'casts') setSheetData(glyphs.filter((g) => g.who.rid === getMyId()));
+    } catch (e) { notify(e.message); }
+  };
+
+  const sheetTitles = {
+    followers: 'Followers',
+    following: 'Following',
+    contacts: 'Contacts',
+    casts: 'Your casts'
+  };
+
   const signOut = async () => {
     if (backendOK && backend) backend.signOut();
     await store.clearProfile();
@@ -671,9 +750,14 @@ export function App() {
         h('div', { class: 'gname' }, profile.glyphName),
         h('p', { class: 'sub' }, `Joined ${new Date(profile.joined).toLocaleDateString()}`),
         h('div', { class: 'statrow' },
-          h('div', { class: 'stat' }, h('span', null, glyphs.length), h('small', null, 'casts')),
-          h('div', { class: 'stat' }, h('span', null, following.size), h('small', null, 'following')),
-          h('div', { class: 'stat' }, h('span', null, contacts.length), h('small', null, 'contacts'))
+          h('button', { class: 'stat', title: 'See your casts', onClick: () => openSheet('casts') },
+            h('b', null, glyphs.filter((g) => g.who.rid === getMyId()).length), h('small', { class: 'sub' }, 'casts')),
+          h('button', { class: 'stat', title: 'See your followers', onClick: () => openSheet('followers') },
+            h('b', null, followers.length), h('small', { class: 'sub' }, 'followers')),
+          h('button', { class: 'stat', title: 'See who you follow', onClick: () => openSheet('following') },
+            h('b', null, following.size), h('small', { class: 'sub' }, 'following')),
+          h('button', { class: 'stat', title: 'See your contacts', onClick: () => openSheet('contacts') },
+            h('b', null, contacts.length), h('small', { class: 'sub' }, 'contacts'))
         )
       ),
       h('div', { class: 'card manifestocard' },
@@ -736,6 +820,15 @@ export function App() {
           '◈')
       )
     ),
+
+    sheet && h(ProfileSheet, {
+      kind: sheet, title: sheetTitles[sheet] || '', rows: sheetData,
+      following, onClose: () => setSheet(null),
+      onToggleFollow: (u) => { toggleFollow(u); openSheet(sheet).catch(() => {}); },
+      onOpenChat: (c) => { setSheet(null); setOpenChat(c.id); setTab('chats'); },
+      onDeleteCast: removeCast,
+      notify
+    }),
 
     shareTarget && h(ShareSheet, {
       glyph: shareTarget,

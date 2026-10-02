@@ -105,10 +105,10 @@ export const store: Store = {
 };
 
 export const KINDS: { kind: GlyphKind; name: string; symbols: string[]; words: string[] }[] = [
-  { kind: 'love', name: 'Love', symbols: ['💗', '💘', '🫶', '🌹'], words: ['held your hand', 'kept your word', 'grew between us', 'wrote itself on me'] },
+  { kind: 'love', name: 'Love', symbols: ['💗', '💘', '💞', '🌹'], words: ['held your hand', 'kept your word', 'grew between us', 'wrote itself on me'] },
   { kind: 'mood', name: 'Mood', symbols: ['🌤️', '🌋', '🌊', '🌙', '⚡'], words: ['slow and bright', 'burning through', 'deep under', 'quiet over the city', 'small storms'] },
   { kind: 'memory', name: 'Memory', symbols: ['🕯️', '📸', '🗝️', '🐚'], words: ['a light that would not go out', 'a room we still share', 'the door we closed', 'the sound of that summer'] },
-  { kind: 'creativity', name: 'Creativity', symbols: ['🪄', '🎨', '🌌', '🧩'], words: ['a trick of the mind', 'still drying somewhere', 'burning quietly outside', 'the missing piece kept talking'] }
+  { kind: 'creativity', name: 'Creativity', symbols: ['✨', '🎨', '🌌', '🧩'], words: ['a trick of the mind', 'still drying somewhere', 'burning quietly outside', 'the missing piece kept talking'] }
 ];
 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
