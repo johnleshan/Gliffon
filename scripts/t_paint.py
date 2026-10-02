@@ -72,12 +72,41 @@ with sync_playwright() as p:
     n3 = a.locator('.paintbox path').count()
     print(f'5. undo/redo: {n} -> {n2} -> {n3} ->', 'PASS' if n2 == 2 and n3 == 3 else 'FAIL')
 
-    # 5. reload restores the draft (tabs reset to reels on reload, so go back)
+    # 6. draft survives reload:
     a.reload(wait_until='networkidle'); a.wait_for_timeout(3000)
     a.locator('.bbtab').nth(2).click(); a.wait_for_timeout(1200)
     n4 = a.locator('.paintbox path').count()
     print('6. draft survives reload:', 'PASS' if n4 == 3 else 'FAIL')
     a.screenshot(path=f'{out}/sp-draft.png')
+
+    # 6b. precision eraser: two separate long strokes, erase ONLY the middle
+    #     of the first one — the other stroke and both outer pieces must survive
+    a.locator('.paintdock button', has_text='').first  # noop check of dock
+    a.evaluate("() => document.querySelector('[aria-label=eraser]')?.click()"); a.wait_for_timeout(400)
+    bbox2 = a.locator('.paintbox').bounding_box()
+    sx2, sy2 = bbox2['width'] / 640.0, bbox2['height'] / 800.0
+    # put a clean two-stroke canvas: wipe first
+    a.evaluate("() => document.querySelector('[aria-label=\"clear canvas\"]')?.click()"); a.wait_for_timeout(300)
+    a.locator('[aria-label=eraser]')  # still eraser; draw with pen via palette tap
+    a.evaluate("() => document.querySelector('[aria-label=\"color #ffffff\"]')?.click()"); a.wait_for_timeout(200)
+    draw(a, bbox2, [
+        [(60, 400), (580, 400)],   # horizontal stroke A
+        [(320, 120), (320, 700)]   # vertical stroke B (far from erase point)
+    ])
+    n_before = a.locator('.paintbox path').count()
+    # erase dead center of stroke A (320,400) — must NOT touch stroke B
+    a.mouse.move(bbox2['x'] + 320 * sx2, bbox2['y'] + 400 * sy2)
+    a.mouse.down(); a.wait_for_timeout(60); a.mouse.up(); a.wait_for_timeout(400)
+    n_after = a.locator('.paintbox path').count()
+    # close dziewion canvas click with eraser on empty ink: nothing changes
+    a.mouse.move(bbox2['x'] + 40 * sx2, bbox2['y'] + 60 * sy2)
+    a.mouse.down(); a.mouse.up(); a.wait_for_timeout(300)
+    n_clean = a.locator('.paintbox path').count()
+    # undo of the erase restores exactly the 2 strokes
+    a.evaluate("() => document.querySelector('[aria-label=undo]')?.click()"); a.wait_for_timeout(400)
+    n_undo = a.locator('.paintbox path').count()
+    print(f'6b. precise erase: {n_before} strokes -> erase A centre -> {n_after} (A split, B intact) -> empty-click unchanged ({n_clean}) -> undo restores {n_undo} ->',
+          'PASS' if n_before in (2,) and n_after >= 2 and n_after < n_before + 3 and n_clean == n_after and n_undo == 2 else 'FAIL')
 
     # 6. cast it
     a.locator('.castform input.field').first.fill('my painted glyph')

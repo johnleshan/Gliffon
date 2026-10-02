@@ -90,7 +90,6 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
   const [color, setColor] = useState(FEATURED[1]);
   const [brush, setBrush] = useState(6);
   const [tool, setTool] = useState('pen'); // 'pen' | 'eraser'
-  const [redo, setRedo] = useState([]);
   const [label, setLabel] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -125,29 +124,47 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
     })();
   }, [backendOK]);
 
-  const undo = useCallback(() => {
-    setStrokes((s) => {
-      if (!s.length) return s;
-      setRedo((r) => [...r, s[s.length - 1]]);
-      return s.slice(0, -1);
-    });
-  }, []);
+  // ---- history: gesture-granular ----
+  // One pen stroke, one erase drag, or one wipe is exactly ONE undo step.
+  // Undo restores the canvas exactly as it was before that gesture — the
+  // eraser can never "delete everything" through undo bookkeeping mistakes.
+  const strokesRef = useRef(strokes);
+  strokesRef.current = strokes;
+  const undoStack = useRef([]);
+  const redoStack = useRef([]);
+  const [caps, setCaps] = useState({ u: 0, r: 0 });
+  const capsOf = () => ({ u: undoStack.current.length, r: redoStack.current.length });
 
-  const redoLast = useCallback(() => {
-    setRedo((r) => {
-      if (!r.length) return r;
-      const last = r[r.length - 1];
-      setStrokes((s) => [...s, last]);
-      return r.slice(0, -1);
-    });
-  }, []);
+  const snapshot = (prev) => {
+    undoStack.current.push(prev);
+    redoStack.current = [];
+    setCaps(capsOf());
+  };
+
+  const undo = () => {
+    if (!undoStack.current.length) return;
+    redoStack.current.push(strokesRef.current);
+    setStrokes(undoStack.current.pop());
+    setCaps(capsOf());
+  };
+
+  const redoLast = () => {
+    if (!redoStack.current.length) return;
+    undoStack.current.push(strokesRef.current);
+    setStrokes(redoStack.current.pop());
+    setCaps(capsOf());
+  };
 
   const clear = () => {
-    setStrokes((s) => { setRedo((r) => [...r, ...s]); return []; });
+    if (!strokesRef.current.length) return;
+    snapshot(strokesRef.current);
+    setStrokes([]);
   };
 
   const discardDraft = () => {
-    setStrokes([]); setRedo([]); setLabel(''); setNote('');
+    setStrokes([]); setCaps({ u: 0, r: 0 });
+    undoStack.current = []; redoStack.current = [];
+    setLabel(''); setNote('');
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
     notify('Draft discarded');
   };
@@ -161,31 +178,85 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
     };
   };
 
+  // ---- eraser: exact, deliberate ----
+  // Erase radius follows the size slider; the ring on screen is the truth —
+  // if the ring is not on the ink, nothing is removed. Erase cuts the strokes
+  // it touches into pieces, it never deletes a whole stroke because one edge
+  // grazed the ring.
+  const eraseR = () => Math.max(8, brush * 2.4);
+
+  // Remove the ink within radius r of p. Returns the new array plus whether
+  // anything actually changed, so a clean click never even enters history.
+  function eraseInk(list, p) {
+    const r = eraseR();
+    const out = [];
+    let changed = false;
+    for (const s of list) {
+      // does this stroke pass through the ring at all (p to segment distance)?
+      if (strokeDistance(s.pts, p.x, p.y) > r) { out.push(s); continue; }
+      changed = true;
+      // Split the polyline around the erased zone. Sample sparser strokes
+      // finely so even grazing hits are cut exactly where the ring crossed.
+      const step = Math.max(2, r / 3);
+      const dense = [];
+      for (let i = 0; i < s.pts.length; i++) {
+        const q = s.pts[i];
+        if (i === 0) { dense.push(q); continue; }
+        const f = s.pts[i - 1];
+        const seg = dist(f.x, f.y, q.x, q.y);
+        const n = Math.ceil(seg / step);
+        for (let k = 1; k <= n; k++) {
+          dense.push({
+            x: f.x + (q.x - f.x) * (k / n),
+            y: f.y + (q.y - f.y) * (k / n)
+          });
+        }
+      }
+      let run = [];
+      for (const q of dense) {
+        if (dist(q.x, q.y, p.x, p.y) <= r) {
+          if (run.length >= 2) out.push({ pts: run, color: s.color, w: s.w });
+          run = [];
+        } else run.push(q);
+      }
+      if (run.length >= 2) out.push({ pts: run, color: s.color, w: s.w });
+    }
+    return [out, changed];
+  }
+
+  // eraser ring position (canvas units), shown whenever the eraser is in play
+  const [hover, setHover] = useState(null);
+
   const down = (e) => {
     e.preventDefault();
     svgEl.current.setPointerCapture?.(e.pointerId);
     const p = pt(e);
     if (tool === 'eraser') {
-      // Remove the topmost stroke the eraser touches; the redo stack
-      // represents undone strokes, which an erase replaces entirely.
-      setRedo([]);
-      setStrokes((s) => {
-        for (let i = s.length - 1; i >= 0; i--) {
-          if (strokeDistance(s[i].pts, p.x, p.y) <= s[i].w + 12) return s.filter((_, j) => j !== i);
-        }
-        return s;
-      });
+      const prev = strokesRef.current;
+      const [next, changed] = eraseInk(prev, p);
+      if (changed) {
+        snapshot(prev);
+        setStrokes(next);
+      }
+      drawing.current = true; // erase drag keeps operating without new snapshots
       return;
     }
     drawing.current = true;
+    snapshot(strokesRef.current); // the whole stroke is one undo step
     cur.current = { pts: [p], color, w: brush };
     setStrokes((s) => [...s, cur.current]);
   };
 
   const move = (e) => {
-    if (!drawing.current) return;
     e.preventDefault();
     const p = pt(e);
+    if (tool === 'eraser') setHover(p); // the ring follows the pointer
+    if (!drawing.current) return;
+    if (tool === 'eraser') {
+      const [next, changed] = eraseInk(strokesRef.current, p);
+      if (changed) setStrokes(next);
+      return;
+    }
     const pts = cur.current.pts;
     const last = pts[pts.length - 1];
     // decimate tiny jitters; big gaps just become fast segments
@@ -194,12 +265,18 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
     setStrokes((s) => [...s]); // re-render the growing stroke
   };
 
-  const up = () => {
-    if (!drawing.current) return;
+  const up = (e) => {
+    // a pen tap becomes a deliberate dot, not an invisible stray stroke
+    if (drawing.current && tool === 'pen' && cur.current && cur.current.pts.length === 1 && e) {
+      const p = pt(e);
+      cur.current.pts.push({ x: p.x + 0.01, y: p.y });
+    }
     drawing.current = false;
     cur.current = null;
-    setRedo([]); // a new stroke invalidates the redo stack
+    setHover(null); // ring only exists while the eraser is in contact or hover
   };
+
+  const leave = () => { setHover(null); };
 
   const cast = async () => {
     if (!strokes.length || !label.trim() || busy) {
@@ -219,7 +296,7 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
         svg: buildSvg(strokes, size.w, size.h)
       });
       try { localStorage.removeItem(DRAFT_KEY); } catch {}
-      setStrokes([]); setRedo([]); setLabel(''); setNote('');
+      setStrokes([]); setCaps({ u: 0, r: 0 }); undoStack.current = []; redoStack.current = [];setLabel(''); setNote('');
     } finally { setBusy(false); }
   };
 
@@ -295,13 +372,22 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
         class: 'paintbox' + (tool === 'eraser' ? ' erasing' : ''),
         viewBox: `0 0 ${size.w} ${size.h}`,
         style: `aspect-ratio:${size.w}/${size.h};--ar:${size.w}/${size.h}`,
-        onPointerDown: down, onPointerMove: move, onPointerUp: up, onPointerCancel: up
+        onPointerDown: down, onPointerMove: move, onPointerUp: up, onPointerLeave: leave,
+        onPointerCancel: up
       },
         h('g', { fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
           strokes.map((s, i) =>
             h('path', { key: i, d: pathD(s.pts), stroke: s.color, 'stroke-width': s.w })
           )
-        )
+        ),
+        // the eraser's promise, drawn on the canvas: exactly this ring is
+        // what a click or drag will affect — if it's not on ink, nothing happens
+        tool === 'eraser' && hover && h('circle', {
+          key: 'erasering', class: 'erasering',
+          cx: hover.x, cy: hover.y, r: eraseR(),
+          fill: 'rgba(255,93,159,0.07)', stroke: '#ffc46b',
+          'stroke-width': 2, 'stroke-dasharray': '5 6'
+        })
       )
     ),
 
@@ -332,12 +418,12 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
           h('input', { type: 'range', min: 2, max: 24, value: brush, onInput: (e) => setBrush(+e.currentTarget.value), 'aria-label': 'brush size' })
         ),
         h('span', { class: 'dockspacer' }),
-        h('button', { class: 'dtool undo', onClick: undo, disabled: !strokes.length, title: 'Undo', 'aria-label': 'undo' },
+        h('button', { class: 'dtool undo', onClick: undo, disabled: !caps.u, title: 'Undo — takes back the last stroke or erase', 'aria-label': 'undo' },
           h('svg', { viewBox: '0 0 24 24', width: 20, height: 20, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
             h('path', { d: 'M9 14L4 9l5-5' }), h('path', { d: 'M4 9h11a5 5 0 0 1 0 10h-3' })
           )
         ),
-        h('button', { class: 'dtool', onClick: redoLast, disabled: !redo.length, title: 'Redo', 'aria-label': 'redo' },
+        h('button', { class: 'dtool', onClick: redoLast, disabled: !caps.r, title: 'Redo', 'aria-label': 'redo' },
           h('svg', { viewBox: '0 0 24 24', width: 20, height: 20, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
             h('path', { d: 'M15 14l5-5-5-5' }), h('path', { d: 'M20 9H9a5 5 0 0 0 0 10h3' })
           )

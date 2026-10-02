@@ -1943,3 +1943,6 @@ button.stat:hover { border-color: rgb(var(--gold-rgb) / 0.35); box-shadow: 0 6px
 }
 .brushdock input[type=range] { flex: 1; min-width: 70px; accent-color: var(--gold); }
 .dockspacer { display: none; }
+
+/* the eraser's circle of truth — what it covers is exactly what it cuts */
+.erasering { pointer-events: none; mix-blend-mode: screen; }
