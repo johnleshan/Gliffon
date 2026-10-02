@@ -62,12 +62,13 @@ with sync_playwright() as p:
     print('4. draft saved:', 'PASS' if draft_ok else 'FAIL')
 
     # 4. undo removes a stroke; redo brings it back
-    # (mouse clicks get swallowed by the fixed appbar at this scroll depth,
-    #  so click through the DOM the way a tap resolution would land)
-    click = lambda label: a.evaluate(f"""() => [...document.querySelectorAll('.paintactions button')].find(b => b.textContent.includes('{label}'))?.click()""")
-    click('Undo'); a.wait_for_timeout(300)
+    # (toolbar buttons are icon-only; click through the DOM via aria-label)
+    click = lambda label: a.evaluate(f"""() => {{
+      const b = [...document.querySelectorAll('.paintdock button')].find(x => (x.getAttribute('aria-label') || '').toLowerCase().includes('{label}'.toLowerCase()));
+      b && b.click(); }}""")
+    click('undo'); a.wait_for_timeout(300)
     n2 = a.locator('.paintbox path').count()
-    click('Redo'); a.wait_for_timeout(300)
+    click('redo'); a.wait_for_timeout(300)
     n3 = a.locator('.paintbox path').count()
     print(f'5. undo/redo: {n} -> {n2} -> {n3} ->', 'PASS' if n2 == 2 and n3 == 3 else 'FAIL')
 

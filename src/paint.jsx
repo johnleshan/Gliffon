@@ -288,42 +288,14 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
   }
 
   return h('section', { class: 'paint on' },
-    h('div', { class: 'paintbar' },
-      h('div', { class: 'palettetools' },
-        h('div', { class: 'palette' },
-          FEATURED.map((c) =>
-            h('button', { key: c, class: 'swatch' + (color === c ? ' picked' : ''), style: `background:${c}`, 'aria-label': 'color ' + c, onClick: () => { setColor(c); setTool('pen'); } })
-          ),
-          h('input', { class: 'swatchpicker', type: 'color', value: color, 'aria-label': 'custom color', onInput: (e) => { setColor(e.currentTarget.value); setTool('pen'); } })
-        ),
-        h('div', { class: 'tools' },
-          h('button', { class: 'tool' + (tool === 'pen' ? ' on' : ''), onClick: () => setTool('pen') },
-            h('svg', { viewBox: '0 0 24 24', width: 18, height: 18, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round' },
-              h('path', { d: 'M17 3l4 4L8 20l-5 1 1-5L17 3z' })
-            ), 'pen'),
-          h('button', { class: 'tool' + (tool === 'eraser' ? ' on' : ''), onClick: () => setTool('eraser') },
-            h('svg', { viewBox: '0 0 24 24', width: 18, height: 18, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round' },
-              h('path', { d: 'M20 20H8l-5-5 9-9 8 8-4 4' })
-            ), 'erase'),
-          h('label', { class: 'brushlabel' },
-            h('input', { type: 'range', min: 2, max: 24, value: brush, onInput: (e) => setBrush(+e.currentTarget.value), 'aria-label': 'brush size' }),
-            h('small', null, brush + 'px')
-          )
-        )
-      ),
-      h('div', { class: 'paintactions' },
-        h('button', { class: 'btn ghost tiny', onClick: undo, disabled: !strokes.length }, 'Undo'),
-        h('button', { class: 'btn ghost tiny', onClick: redoLast, disabled: !redo.length }, 'Redo'),
-        h('button', { class: 'btn ghost tiny', onClick: clear, disabled: !strokes.length }, 'Clear'),
-        h('button', { class: 'btn ghost tiny', onClick: discardDraft, disabled: !strokes.length }, 'Discard draft')
-      )
-    ),
+    // the canvas is the hero; it always fits above the dock, never scrolls away
     h('div', { class: 'paintcanvas' },
       h('svg', {
-        ref: svgEl, class: 'paintbox' + (tool === 'eraser' ? ' erasing' : ''),
+        ref: svgEl,
+        class: 'paintbox' + (tool === 'eraser' ? ' erasing' : ''),
         viewBox: `0 0 ${size.w} ${size.h}`,
-        onPointerDown: down, onPointerMove: move, onPointerUp: up, onPointerLeave: up,
-        onPointerCancel: up
+        style: `aspect-ratio:${size.w}/${size.h};--ar:${size.w}/${size.h}`,
+        onPointerDown: down, onPointerMove: move, onPointerUp: up, onPointerCancel: up
       },
         h('g', { fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
           strokes.map((s, i) =>
@@ -332,6 +304,53 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
         )
       )
     ),
+
+    // sticky glass dock: colour row on top, tools row under it — always visible
+    h('div', { class: 'paintdock glass' },
+      h('div', { class: 'dockrow colors' },
+        FEATURED.map((c) =>
+          h('button', { key: c, class: 'swatch' + (color === c ? ' picked' : ''), style: `background:${c}`, 'aria-label': 'color ' + c, title: 'paint in this colour', onClick: () => { setColor(c); setTool('pen'); } })
+        ),
+        h('label', { class: 'swatchpicker-wrap', title: 'any colour' },
+          h('span', { class: 'swatch rainbow', 'aria-hidden': 'true' }),
+          h('input', { class: 'swatchpicker', type: 'color', value: color, 'aria-label': 'custom color', onInput: (e) => { setColor(e.currentTarget.value); setTool('pen'); } })
+        )
+      ),
+      h('div', { class: 'dockrow tools' },
+        h('button', { class: 'dtool' + (tool === 'pen' ? ' on' : ''), onClick: () => setTool('pen'), title: 'Pen', 'aria-label': 'pen' },
+          h('svg', { viewBox: '0 0 24 24', width: 20, height: 20, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+            h('path', { d: 'M17 3l4 4L8 20l-5 1 1-5L17 3z' })
+          )
+        ),
+        h('button', { class: 'dtool' + (tool === 'eraser' ? ' on' : ''), onClick: () => { setTool('eraser'); notify('Eraser — touch a stroke to remove it'); }, title: 'Eraser', 'aria-label': 'eraser' },
+          h('svg', { viewBox: '0 0 24 24', width: 20, height: 20, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+            h('path', { d: 'M20 20H8l-5-5 9-9 8 8-4 4' })
+          )
+        ),
+        h('label', { class: 'brushdock', title: 'brush size' },
+          h('span', { class: 'brushdot', style: `width:${8 + brush * 1.1}px;height:${8 + brush * 1.1}px;background:${color}` }),
+          h('input', { type: 'range', min: 2, max: 24, value: brush, onInput: (e) => setBrush(+e.currentTarget.value), 'aria-label': 'brush size' })
+        ),
+        h('span', { class: 'dockspacer' }),
+        h('button', { class: 'dtool undo', onClick: undo, disabled: !strokes.length, title: 'Undo', 'aria-label': 'undo' },
+          h('svg', { viewBox: '0 0 24 24', width: 20, height: 20, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+            h('path', { d: 'M9 14L4 9l5-5' }), h('path', { d: 'M4 9h11a5 5 0 0 1 0 10h-3' })
+          )
+        ),
+        h('button', { class: 'dtool', onClick: redoLast, disabled: !redo.length, title: 'Redo', 'aria-label': 'redo' },
+          h('svg', { viewBox: '0 0 24 24', width: 20, height: 20, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+            h('path', { d: 'M15 14l5-5-5-5' }), h('path', { d: 'M20 9H9a5 5 0 0 0 0 10h3' })
+          )
+        ),
+        h('button', { class: 'dtool wipe', onClick: clear, disabled: !strokes.length, title: 'Wipe the canvas', 'aria-label': 'clear canvas' },
+          h('svg', { viewBox: '0 0 24 24', width: 20, height: 20, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+            h('path', { d: 'M3 6h18' }), h('path', { d: 'M8 6V4h8v2' }),
+            h('path', { d: 'M6 6l1 14h10l1-14' })
+          )
+        )
+      )
+    ),
+
     h('div', { class: 'castform' },
       h('input', {
         class: 'field', placeholder: 'Name that feeling…', value: label, maxLength: 40,
@@ -343,7 +362,8 @@ export function Paint({ profile, backendOK, backend, onCast, notify }) {
       }),
       h('div', { class: 'row' },
         h('button', { class: 'btn primary cast', onClick: cast, disabled: busy || !strokes.length || !label.trim() }, 'Cast painted glyph ✦'),
-        h('button', { class: 'btn ghost', onClick: saveToShelf, disabled: busy || !strokes.length }, 'Save to collection')
+        h('button', { class: 'btn ghost', onClick: saveToShelf, disabled: busy || !strokes.length }, 'Save to collection'),
+        h('button', { class: 'btn ghost tiny', onClick: discardDraft, disabled: !strokes.length, title: 'throw the whole draft away' }, 'Discard draft')
       )
     ),
     mine.length > 0 && h('div', { class: 'shelf' },

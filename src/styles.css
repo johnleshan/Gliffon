@@ -1079,7 +1079,7 @@ nav button.active .navicon {
   .stat b { font-size: 30px; }
   .pulse, .profile { padding-inline: 28px; }
   .card { padding: 20px; }
-  .paintcanvas .paintbox { width: min(74vw, 620px); }
+  .paintcanvas .paintbox { height: min(56vh, 620px); }
   nav { border-radius: 999px 999px 0 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
   .share-sheet { align-items: center; }
 }
@@ -1858,7 +1858,7 @@ button.contact .dot { flex: none; align-self: center; }
 .shelfdel:hover { background: rgb(var(--rose-rgb) / 0.25); }
 .paint .row { display: flex; gap: 10px; flex-wrap: wrap; }
 
-/* profile stats are interactive — they are doors, not labels */
+/* profile stats are interactive ï¿½ they are doors, not labels */
 button.stat { background: var(--statc, rgb(var(--rose-rgb) / 0.09)); border: 0; padding: 14px 10px 12px; cursor: pointer; color: var(--text); }
 button.stat:hover { border-color: rgb(var(--gold-rgb) / 0.35); box-shadow: 0 6px 20px -10px rgb(var(--gold-rgb) / 0.4); }
 
@@ -1869,3 +1869,77 @@ button.stat:hover { border-color: rgb(var(--gold-rgb) / 0.35); box-shadow: 0 6px
 .sheet .contact .devinfo .sub { font-size: 11.5px; }
 .sheet .empty { color: var(--muted); font-size: 13.5px; margin: 8px 0 2px; }
 .sheet .btn.tiny { padding: 6px 12px; font-size: 11.5px; }
+
+/* ============ paint studio dock ï¿½ everything is a big obvious control ============ */
+.paint { padding: calc(env(safe-area-inset-top) + 70px) 16px 130px; gap: 14px; }
+.paint .composerhead { text-align: center; }
+
+/* canvas: fit the space between appbar and dock, any orientation, any screen */
+.paintcanvas { display: flex; justify-content: center; }
+.paintbox {
+  height: min(50vh, 560px); width: auto; max-width: min(92vw, 680px);
+  border-radius: 20px; touch-action: none; cursor: crosshair;
+  border: 1px solid rgb(var(--gold-rgb) / 0.25);
+  background:
+    radial-gradient(120% 110% at 50% 0%, #0f1535 0%, #0a0f22 70%);
+  box-shadow: 0 24px 60px -24px rgb(0 0 0 / .7), inset 0 0 40px rgb(var(--violet-rgb) / 0.05);
+}
+.paintbox.erasing { cursor: cell; }
+
+/* the dock: sticky glass ï¿½ colour row above, tools row below */
+.paintdock {
+  position: sticky; bottom: calc(64px + env(safe-area-inset-bottom) + 10px);
+  z-index: 60; width: min(94vw, 680px); margin: 0 auto;
+  display: flex; flex-direction: column; gap: 9px;
+  padding: 11px 14px; border-radius: 22px;
+  border: 1px solid rgb(var(--gold-rgb) / 0.25);
+  background: rgb(var(--ink-rgb) / 0.72); backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 18px 44px -18px rgb(0 0 0 / .8);
+}
+.dockrow { display: flex; gap: 8px; align-items: center; justify-content: center; }
+.dockrow.colors, .dockrow.tools { flex-wrap: wrap; row-gap: 9px; }
+.brushdock { flex: 1 1 150px; max-width: 220px; }
+.dockspacer { display: none; }
+
+/* swatches: bigger, springy, current colour lifted */
+.swatch {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent;
+  transition: transform .15s var(--ease-spring, ease), border-color .15s ease, box-shadow .15s ease;
+}
+.swatch:hover { transform: scale(1.18) rotate(3deg); }
+.swatch.picked { border-color: var(--gold); transform: scale(1.18); box-shadow: 0 0 0 3px rgb(var(--gold-rgb) / 0.25), 0 0 16px -2px rgb(var(--gold-rgb) / 0.65); }
+
+/* any-colour picker dressed as a rainbow dot */
+.swatchpicker-wrap { position: relative; width: 30px; height: 30px; cursor: pointer; }
+.swatch.rainbow {
+  display: block; width: 100%; height: 100%; border-radius: 50%;
+  background: conic-gradient(#ff5d9f, #ffc46b, #54d977, #00e5ff, #5d63e6, #8b7bff, #ff5d9f);
+  border: 2px solid var(--gold) ; opacity: .9; transition: transform .15s;
+}
+.swatchpicker-wrap:hover .rainbow, .swatch.rainbow { transform-origin: center; }
+.swatchpicker-wrap:hover .rainbow { transform: scale(1.15) rotate(-6deg); }
+.swatchpicker { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+
+/* tool buttons: circular, forty pixels, impossible to miss */
+.dtool {
+  width: 42px; height: 42px; border-radius: 14px; cursor: pointer; flex: none;
+  display: grid; place-items: center; color: var(--text);
+  border: 1px solid rgb(var(--cream-rgb) / 0.14); background: rgb(var(--cream-rgb) / 0.05);
+  transition: transform .15s var(--ease-spring, ease), border-color .15s, background .15s, color .15s;
+}
+.dtool:hover { transform: translateY(-2px); border-color: rgb(var(--gold-rgb) / 0.4); }
+.dtool:active { transform: scale(.92); }
+.dtool.on { color: var(--gold); border-color: rgb(var(--gold-rgb) / 0.6); background: rgb(var(--gold-rgb) / 0.13); box-shadow: 0 0 18px -6px rgb(var(--gold-rgb) / 0.6) inset; }
+.dtool:disabled { opacity: .32; cursor: default; transform: none; }
+.dtool.wipe:hover { color: var(--accent); border-color: rgb(var(--rose-rgb) / 0.5); }
+
+/* brush size: live dot that grows with the slider, tinted the current colour */
+.brushdock { display: flex; gap: 9px; align-items: center; flex: 1 1 100%; order: 10; }
+.brushdot {
+  flex: none; border-radius: 50%; display: inline-block;
+  border: 1px solid rgb(255 255 255 / .25);
+  box-shadow: 0 0 12px -2px rgb(255 255 255 / .35);
+  transition: width .14s ease, height .14s ease;
+}
+.brushdock input[type=range] { flex: 1; min-width: 70px; accent-color: var(--gold); }
+.dockspacer { display: none; }
