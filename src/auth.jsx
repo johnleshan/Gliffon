@@ -106,7 +106,7 @@ export function Auth({ connected, onSignIn, onSignUp, onSetPassword }) {
       class: 'avatar glow onboardbadge',
       style: 'width:96px;height:96px;font-size:38px'
     }, symbol),
-    h('h1', { class: 'brand' }, 'Glifon'),
+    h('h1', { class: 'brand' }, 'Gliffon'),
 
     h('div', { class: 'authtabs' },
       [
@@ -194,7 +194,7 @@ export function Auth({ connected, onSignIn, onSignUp, onSetPassword }) {
 
     h('p', { class: 'foot' },
       connected
-        ? 'Live on Glifon — your account works on every device you sign in from'
+        ? 'Live on gliffon — your account works on every device you sign in from'
         : 'Working offline — connect to sign in to the global Wall')
   );
 }

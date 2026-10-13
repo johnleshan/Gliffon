@@ -26,9 +26,9 @@ function PublicGlyph({ glyphId }) {
         const row = rows.find((r) => r.id === glyphId);
         if (!row) { setNotFound(true); return; }
         const who = row.author_name || row.author_handle || 'someone';
-        document.title = `${row.label || 'A glyph'} — ${who} on Glifon`;
+        document.title = `${row.label || 'A glyph'} — ${who} on Gliffon`;
         setMeta('og:title', `${row.symbol} ${row.label || 'A glyph'}`);
-        setMeta('og:description', `${who} cast this glyph on Glifon`);
+        setMeta('og:description', `${who} cast this glyph on Gliffon`);
         setMeta('og:url', location.origin + '/g/' + glyphId);
         setG(row);
       } catch { setNotFound(true); }
@@ -38,7 +38,7 @@ function PublicGlyph({ glyphId }) {
   if (notFound) {
     return h('div', { class: 'publicglyph' },
       h('p', { class: 'sub' }, 'This glyph is no longer available.'),
-      h('a', { class: 'btn primary', href: '/' }, 'Open Glifon')
+      h('a', { class: 'btn primary', href: '/' }, 'Open Gliffon')
     );
   }
   if (!g) return h('div', { class: 'boot' }, h('span', { class: 'preview-glyph glow' }, '◆'));
@@ -51,7 +51,7 @@ function PublicGlyph({ glyphId }) {
       g.note ? h('p', { class: 'sub' }, g.note) : null,
       h('p', { class: 'pgwho' }, `${g.author_symbol || '✦'} ${who}`),
       h('p', { class: 'sub' }, `${g.likes || 0} likes`),
-      h('a', { class: 'btn primary', href: '/' }, 'Cast yours on Glifon ✦')
+      h('a', { class: 'btn primary', href: '/' }, 'Cast yours on Gliffon ✦')
     )
   );
 }
@@ -80,7 +80,7 @@ function YourDevices() {
   return h('div', { class: 'keyrow col' },
     h('div', { class: 'keyinfo' },
       h('b', null, 'Your devices'),
-      h('span', { class: 'sub' }, 'signed in everywhere you use Glifon')
+      h('span', { class: 'sub' }, 'signed in everywhere you use Gliffon')
     ),
     h('div', { class: 'devicelist' },
       (devices || []).map((d) =>
@@ -614,7 +614,7 @@ export function App() {
         };
         await store.saveProfile(merged);
         setProfile(merged);
-        notify('Welcome to Glifon ✦');
+        notify('Welcome to Gliffon ✦');
         event('signup', { symbol: merged.symbol });
         refresh();
       },
@@ -658,7 +658,7 @@ export function App() {
 
   return h('div', { id: 'app' },
     h('header', { class: 'appbar' },
-      h('span', { class: 'brand', onClick: () => setTab('reels') }, 'Glifon'),
+      h('span', { class: 'brand', onClick: () => setTab('reels') }, 'Gliffon'),
       backendOK && h('span', { class: 'live-indicator' }, 'live'),
       h('div', { class: 'tabs' },
         ['reels', 'glyphs', 'paint', 'chats', 'pulse', 'profile'].map((t) =>
@@ -761,9 +761,9 @@ export function App() {
         )
       ),
       h('div', { class: 'card manifestocard' },
-        h('h3', { class: 'cardtitle' }, 'Glifon is where symbols breathe'),
+        h('h3', { class: 'cardtitle' }, 'Gliffon is where symbols breathe'),
         h('p', { class: 'manifesto' },
-          'Glifon is not just an app — it is a living canvas of connection. In a world of fleeting posts and endless scrolls, we restore meaning: here, emotions are carved into symbols, shared as living glyphs.'),
+          'Gliffon is not just an app — it is a living canvas of connection. In a world of fleeting posts and endless scrolls, we restore meaning: here, emotions are carved into symbols, shared as living glyphs.'),
         h('p', { class: 'manifesto' },
           'Every mood, every memory, every bond becomes a spark — intimate, timeless, unforgettable.'),
         h('div', { class: 'slogans' },

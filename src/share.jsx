@@ -36,7 +36,7 @@ export function ShareSheet({ glyph, contacts = [], onSendToContact, onCastToWall
         h('button', {
           class: 'btn ghost', onClick: async () => {
             if (navigator.share) {
-              try { await navigator.share({ title: 'Glifon glyph', text: glyphCard(glyph), url: shareUrl }); } catch {}
+              try { await navigator.share({ title: 'Gliffon glyph', text: glyphCard(glyph), url: shareUrl }); } catch {}
             }
             onClose();
           }

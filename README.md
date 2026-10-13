@@ -1,8 +1,8 @@
-# Glifon (Glifon) ◆
+# Gliffon (Glifon) ◆
 
 > A next-generation symbolic social platform — express emotions, memories, and creativity through digital glyphs.
 
-Glifon helps you say what words can't. Instead of posts and likes, you cast **glyphs** — small symbolic expressions of what you feel, remember, or imagine. It's built to be a **Progressive Web App (PWA)**: installable, offline-capable, local-first, and extremely fast (≈ 9 KB gzipped app code).
+Gliffon helps you say what words can't. Instead of posts and likes, you cast **glyphs** — small symbolic expressions of what you feel, remember, or imagine. It's built to be a **Progressive Web App (PWA)**: installable, offline-capable, local-first, and extremely fast (≈ 9 KB gzipped app code).
 
 ---
 
@@ -45,7 +45,7 @@ npm run preview
 
 ### Installing as an app
 
-Serve the build over HTTPS (or localhost), then use your browser's **Install / Add to Home Screen** option. Once installed, Glifon runs standalone and works fully offline.
+Serve the build over HTTPS (or localhost), then use your browser's **Install / Add to Home Screen** option. Once installed, Gliffon runs standalone and works fully offline.
 
 ## 🏗 Architecture
 
