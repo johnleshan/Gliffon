@@ -82,7 +82,7 @@ async function j(path, opts = {}) {
     // A non-JSON response means we hit the SPA shell instead of an API route
     // (e.g. pointing at a preview without serverless functions). Surface that
     // clearly rather than failing with a cryptic "Unexpected token <".
-    throw new Error('That address is not a Gliffon API (it served the web page)');
+    throw new Error('That address is not a Glifon API (it served the web page)');
   });
   if (!r.ok || d.error) throw new Error(d.error || r.status);
   return d;

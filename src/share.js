@@ -1,7 +1,7 @@
 export function glyphCard(g) {
   const lines = [`${g.symbol}  ${g.label}`];
   if (g.note) lines.push(g.note);
-  lines.push('— shared from Gliffon ◆');
+  lines.push('— shared from Glifon ◆');
   return lines.join('\n');
 }
 

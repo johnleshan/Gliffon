@@ -11,7 +11,7 @@ export function ConnectSheet({ connected, onClose, onSaved }) {
       h('h3', null, connected ? 'Connected ✓' : 'Connect'),
       connected
         ? h('p', { class: 'sub' }, `Live at ${getBackendConfig().url}. Chats and the Wall are synced across devices.`)
-        : h('p', { class: 'sub' }, 'Paste the URL of your deployed Gliffon (from `vercel --prod`). Leave blank to use same-origin.'),
+        : h('p', { class: 'sub' }, 'Paste the URL of your deployed Glifon (from `vercel --prod`). Leave blank to use same-origin.'),
       !connected ? null : (
         h('button', {
           class: 'btn ghost', onClick: () => {

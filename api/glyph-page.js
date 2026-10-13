@@ -8,6 +8,13 @@ const esc = (v) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+// A painted glyph is rendered as its actual drawing (cleanSvg has already
+// vetted the markup against the painter's grammar), not as the fallback symbol.
+const svgTag = (s) =>
+  s && s.startsWith('<svg')
+    ? s.replace('<svg ', '<svg style="width:9rem;height:auto;display:block;margin:0 auto" aria-hidden="true" ')
+    : '';
+
 // Server-rendered share page. Social crawlers do not execute JS, so the OG tags
 // have to exist in the initial HTML response. Everything interpolated here is
 // user-authored, so it is escaped before it reaches the document.
@@ -16,14 +23,7 @@ export default bind(async (req, res) => {
   const id = url.searchParams.get('id');
   if (!id) {
     res.statusCode = 400;
-// A painted glyph is rendered as its actual drawing (cleanSvg has already
-// vetted the markup against the painter's grammar), not as the fallback symbol.
-const svgTag = (s) =>
-  s && s.startsWith('<svg')
-    ? s.replace('<svg ', '<svg style="width:9rem;height:auto;display:block;margin:0 auto" aria-hidden="true" ')
-    : '';
-
-res.setHeader('content-type', 'text/html; charset=utf-8');
+    res.setHeader('content-type', 'text/html; charset=utf-8');
     return res.end('<!doctype html><meta charset="utf-8"><p>Missing glyph id.</p>');
   }
 
@@ -42,11 +42,11 @@ res.setHeader('content-type', 'text/html; charset=utf-8');
   }
 
   const site = 'https://gliffon.vercel.app';
-  const title = row ? `${row.symbol} ${row.label || 'A glyph'}` : 'Gliffon';
-  const who = row ? row.author_handle || row.author_name || 'someone' : 'Gliffon';
+  const title = row ? `${row.symbol} ${row.label || 'A glyph'}` : 'Glifon';
+  const who = row ? row.author_handle || row.author_name || 'someone' : 'Glifon';
   const desc = row
-    ? `${who} cast this glyph on Gliffon — say it in symbols. ${row.likes || 0} likes`
-    : 'Gliffon is where symbols breathe. A living diary of glyphs — say it in symbols.';
+    ? `${who} cast this glyph on Glifon — say it in symbols. ${row.likes || 0} likes`
+    : 'Glifon is where symbols breathe. A living diary of glyphs — say it in symbols.';
 
   res.setHeader('content-type', 'text/html; charset=utf-8');
   res.end(`<!doctype html>
@@ -54,9 +54,9 @@ res.setHeader('content-type', 'text/html; charset=utf-8');
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>${esc(title)} · Gliffon</title>
+    <title>${esc(title)} · Glifon</title>
     <meta name="description" content="${esc(desc)}">
-    <meta property="og:site_name" content="Gliffon">
+    <meta property="og:site_name" content="Glifon">
     <meta property="og:title" content="${esc(title)}">
     <meta property="og:description" content="${esc(desc)}">
     <meta property="og:url" content="${esc(site + '/g/' + id)}">
@@ -69,10 +69,10 @@ res.setHeader('content-type', 'text/html; charset=utf-8');
     <main>
       <div style="font-size:5rem;line-height:1;border-radius:50%">${row && row.svg ? svgTag(row.svg) : esc(row ? row.symbol : '◈')}</div>
       <h1 style="font-size:1.75rem;margin:1rem 0 .35rem">${esc(row ? row.label || 'A glyph' : 'This glyph is no longer available')}</h1>
-      <p style="color:#ffc46b;margin:0 0 .35rem">${esc(row ? (row.author_symbol || '✦') + ' ' + who : 'Gliffon')}</p>
+      <p style="color:#ffc46b;margin:0 0 .35rem">${esc(row ? (row.author_symbol || '✦') + ' ' + who : 'Glifon')}</p>
       <p style="color:#9fadd0;margin:0">${esc(row ? row.likes + ' likes' : 'Say it in symbols.')}</p>
-      <a href="${esc(site)}" style="display:inline-block;margin-top:1.75rem;padding:.7rem 1.4rem;border-radius:999px;background:linear-gradient(135deg,#8b7bff,#ff5d9f);color:#fff;text-decoration:none;font-weight:600">Cast yours on Gliffon</a>
-      <p style="color:#6d7aa3;font-size:.8rem;margin-top:1.5rem">Gliffon is where symbols breathe.</p>
+      <a href="${esc(site)}" style="display:inline-block;margin-top:1.75rem;padding:.7rem 1.4rem;border-radius:999px;background:linear-gradient(135deg,#8b7bff,#ff5d9f);color:#fff;text-decoration:none;font-weight:600">Cast yours on Glifon</a>
+      <p style="color:#6d7aa3;font-size:.8rem;margin-top:1.5rem">Glifon is where symbols breathe.</p>
     </main>
   </body>
 </html>`);

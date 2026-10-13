@@ -12,9 +12,9 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: 'Gliffon', body: event.data ? event.data.text() : '' };
+    data = { title: 'Glifon', body: event.data ? event.data.text() : '' };
   }
-  const title = data.title || 'Gliffon';
+  const title = data.title || 'Glifon';
   const options = {
     body: data.body || '',
     icon: data.icon || '/icon.svg',

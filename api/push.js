@@ -17,7 +17,7 @@ export default bind(async (req, res) => {
     if (!rate(req, res, { key: 'pushtest', max: 5, windowMs: 60000 })) return;
     const b = await readBody(req);
     const sent = await sendToUser(sql, me.id, {
-      title: String(b.title || 'Gliffon').slice(0, 80),
+      title: String(b.title || 'Glifon').slice(0, 80),
       body: String(b.body || 'Push notifications are working.').slice(0, 200),
       icon: '/icon.svg',
       badge: '/icon.svg',
