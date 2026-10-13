@@ -1,4 +1,4 @@
-# Gliffon (Glifon) ◆
+# Gliffon ◆
 
 > A next-generation symbolic social platform — express emotions, memories, and creativity through digital glyphs.
 

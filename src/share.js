@@ -11,7 +11,7 @@ export const remind = {
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') return 'denied';
     localStorage.setItem('glifon.remind', 'on');
-    new Notification('Glifon', { body: 'Daily glyph reminder is on. See you here ✦' });
+    new Notification('Gliffon', { body: 'Daily glyph reminder is on. See you here ✦' });
     return 'on';
   },
   disable() {
@@ -29,7 +29,7 @@ export const remind = {
     if (next <= now) next.setDate(next.getDate() + 1);
     setTimeout(() => {
       if (document.visibilityState !== 'hidden') return;
-      new Notification('Glifon', { body: 'Time to cast your daily glyph ✦', tag: 'glifon-daily' });
+      new Notification('Gliffon', { body: 'Time to cast your daily glyph ✦', tag: 'glifon-daily' });
       this.schedule(hour);
     }, next - now);
   }

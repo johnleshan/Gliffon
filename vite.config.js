@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Glifon',
-        short_name: 'Glifon',
+        name: 'Gliffon',
+        short_name: 'Gliffon',
         description: 'Express emotions, memories and creativity through digital glyphs.',
         theme_color: '#0b0b14',
         background_color: '#0b0b14',
